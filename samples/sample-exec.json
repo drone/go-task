@@ -1,0 +1,10 @@
+{
+    "task": {
+        "id": "67c0938c-9348-4c5e-8624-28218984e09f",
+        "type": "sample/exec",
+        "data": {
+            "script": [ "echo hello", "echo world" ],
+            "shell": "sh"
+        }
+    }
+}
