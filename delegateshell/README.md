@@ -34,7 +34,7 @@ A way to use this client would be:
 ```
 
 ## TODOs
-1. It uses register call for heartbeat. Maybe we should use polling tasks as heartbeat. This reduces network payload on Harness gateway significantly
+1. It uses register call for heartbeat. Maybe we should use polling tasks as heartbeat. This reduces network load on Harness gateway significantly
 2. thread pool abstraction should be there for handle thread&resource allocation&isolation
 3. Create a top level package for logger. Use that everywhere
 4. Shutdownhook is not there
