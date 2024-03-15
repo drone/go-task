@@ -11,7 +11,6 @@ type (
 	RegisterRequest struct {
 		AccountID  string `json:"accountId,omitempty"`
 		RunnerName string `json:"delegateName,omitempty"`
-		// Token              string   `json:"delegateRandomToken,omitempty"`
 		LastHeartbeat     int64    `json:"lastHeartBeat,omitempty"`
 		ID                string   `json:"delegateId,omitempty"`
 		Type              string   `json:"delegateType,omitempty"`

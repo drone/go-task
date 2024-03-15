@@ -9,7 +9,7 @@ delegate-shell library provides two utlities.
 The idea is `delegate-shell` library should be a standalone library. Runner can use this library to handle all lifecycle events and interations with Harness.
 
 # Usage
-Example codes in `delegateshell/example` folder.
+Example codes in `delegateshell/example` folder. You can run it by `go run main.go`
 
 A way to use this client would be:
 1. Registeration & heartbeat
@@ -25,12 +25,12 @@ A way to use this client would be:
 ```
 2. Poll tasks
 ```
-	requestsChan := make(chan *client.RunnerRequest, 3)
+  requestsChan := make(chan *client.RunnerRequest, 3)
 
-	// Start polling for events
-	eventsServer := poller.New(managerClient, requestsChan)
-	eventsServer.PollRunnerEvents(ctx, 3, info.ID, time.Second*10)
-    // next: process requests from 'requestsChan'
+  // Start polling for events
+  eventsServer := poller.New(managerClient, requestsChan)
+  eventsServer.PollRunnerEvents(ctx, 3, info.ID, time.Second*10)
+  // next: process requests from 'requestsChan'
 ```
 
 ## TODOs

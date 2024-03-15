@@ -14,10 +14,10 @@ import (
 
 func main() {
 	// Create a delegate client
-	managerClient := client.New("https://localhost:9090", "kmpySmUISimoRrJL6NL73w", "2f6b0988b6fb3370073c3d0505baee59", true, "")
+	managerClient := client.New("https://localhost:9090", "kmpySmUISimoRrJL6NL73w" /* account id */, "use your token", true, "")
 
 	// The poller needs a client that interacts with the task management system and a router to route the tasks
-	keepAlive := heartbeat.New("kmpySmUISimoRrJL6NL73w", "2f6b0988b6fb3370073c3d0505baee59", "dlite-xingchi", []string{"k8s-runner"}, managerClient)
+	keepAlive := heartbeat.New("kmpySmUISimoRrJL6NL73w"/* account id */, "use your token", "new-runner", []string{"k8s-runner"}, managerClient)
 
 	// // Register the poller
 	ctx := context.Background()
