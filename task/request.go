@@ -16,4 +16,10 @@ type Request struct {
 	// Secrets provides the names and values of secrets
 	// that are available to the task execution.
 	Secrets map[string]string `json:"-"`
+
+	// Account provides the account identifier.
+	Account string `json:"account"`
+
+	// Server will assign a request id to track status of the request
+	RequestId string `json:"id"`
 }
