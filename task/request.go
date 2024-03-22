@@ -20,6 +20,6 @@ type Request struct {
 	// Account provides the account identifier.
 	Account string `json:"account"`
 
-	// Server will assign a request id to track status of the request
-	RequestId string `json:"id"`
+	// ID provides a unique identifier to track the status of the request.
+	ID string `json:"id"`
 }
