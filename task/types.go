@@ -10,10 +10,6 @@ type Task struct {
 	// ID provides a unique task identifier.
 	ID string `json:"id"`
 
-	// Account provides the account identifier.
-	// TODO do we need this?
-	Account string `json:"account"`
-
 	// Type provides the task type.
 	Type string `json:"type"`
 
