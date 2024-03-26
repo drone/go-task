@@ -4,8 +4,6 @@
 
 package task
 
-import "encoding/json"
-
 type Task struct {
 	// ID provides a unique task identifier.
 	ID string `json:"id"`
@@ -14,14 +12,14 @@ type Task struct {
 	Type string `json:"type"`
 
 	// Data provides task execution data.
-	Data json.RawMessage `json:"data"`
+	Data []byte `json:"data"`
 
 	// Driver provides the execution driver used to
 	// execute the task.
 	Driver string `json:"driver"`
 
 	// Config provides the execution driver configuration.
-	Config json.RawMessage `json:"config"`
+	Config []byte `json:"config"`
 
 	// Forward provides instructions for forwarding
 	// the task to another runner node in the network.
