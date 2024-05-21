@@ -26,6 +26,9 @@ type Task struct {
 	// Forward provides instructions for forwarding
 	// the task to another runner node in the network.
 	Forward *Forward `json:"forward"`
+
+	// Logger provides instructions on where to log the output.
+	Logger *Logger `json:"logger"`
 }
 
 // Forward provides instructions for forward a task
@@ -34,6 +37,16 @@ type Forward struct {
 	Address  string `json:"string"`
 	Insecure bool   `json:"insecure"`
 	Certs    Certs  `json:"certs"`
+}
+
+// Logger provides instructions for logging the output
+// of a task execution.
+type Logger struct {
+	Address  string `json:"address"`
+	Insecure bool   `json:"insecure"`
+	Token    string `json:"token"`
+	Key      string `json:"key"`
+	Account  string `json:"account"`
 }
 
 // Certs provides tls certificates.
