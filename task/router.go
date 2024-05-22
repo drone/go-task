@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"os"
+	"io"
 
 	"github.com/drone/go-task/task/evaler"
 	"github.com/drone/go-task/task/logger"
@@ -100,10 +100,10 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 	// add the structured logger to the context.
 	ctx = logger.WithContext(ctx, log)
 
-	// Set the task logger to stdout if it is not set.
+	// Discard task logs if a logger is not set.
 	// A custom logger can be set by adding a middleware to the router.
 	if req.Logger == nil {
-		req.Logger = os.Stdout
+		req.Logger = io.Discard
 	}
 
 	// handle the primary task
