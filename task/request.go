@@ -4,6 +4,8 @@
 
 package task
 
+import "io"
+
 // Request defines a task request.
 type Request struct {
 	// Task provides the current task.
@@ -22,4 +24,7 @@ type Request struct {
 
 	// ID provides a unique identifier to track the status of the request.
 	ID string `json:"id"`
+
+	// Logger is available to the task execution to write log output.
+	Logger io.Writer `json:"-"`
 }
