@@ -17,6 +17,7 @@ import (
 	"github.com/drone/go-task/task/cloner"
 	"github.com/drone/go-task/task/download"
 	"github.com/drone/go-task/task/drivers/cgi"
+	"github.com/drone/go-task/task/secret/vault"
 )
 
 var (
@@ -95,8 +96,9 @@ func main() {
 
 	// create the task router
 	router := task.NewRouter()
-	router.RegisterFunc("sample/exec", execHandler) // sample bult-in handler
-	router.RegisterFunc("sample/file", fileHandler) // sample bult-in handler
+	router.RegisterFunc("sample/exec", execHandler)               // sample bult-in handler
+	router.RegisterFunc("sample/file", fileHandler)               // sample bult-in handler
+	router.RegisterFunc("secret/vault/fetch", vault.FetchHandler) // vault handler to fetch secrets
 	router.NotFound(
 		// default to cgi handler when no built-in
 		// task handler is found.

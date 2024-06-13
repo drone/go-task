@@ -42,6 +42,12 @@ Get a secret from vault (cgi):
 ./go-task --pretty samples/get-secret/task.json
 ```
 
+Get a secret from vault (built-in):
+
+```sh
+./go-task --pretty task/secret/vault/fetch.json
+```
+
 Get a user (cgi) using a remote artifact (git):
 
 ```sh
