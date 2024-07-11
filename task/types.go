@@ -54,6 +54,20 @@ type Certs struct {
 	CA      []byte `json:"ca"`
 }
 
+// Repository provides the repository used for
+// custom task execution.
+type Repository struct {
+	Clone    string `json:"clone"`
+	Ref      string `json:"ref"`
+	Sha      string `json:"sha"`
+	Download string `json:"download"`
+}
+
+// Secret stores the value of a secret variable.
+type Secret struct {
+	Value string `json:"value"`
+}
+
 // Artifact provides the artifact used for custom
 // task execution.
 type Artifact struct {
@@ -62,23 +76,6 @@ type Artifact struct {
 	Checksum    string            `json:"checksum,omitempty"`
 	Insecure    bool              `json:"insecure,omitempty"`
 	Header      map[string]string `json:"header,omitempty"`
-	Scripts     *Scripts          `json:"scripts,omitempty"`
-}
-
-type Scripts struct {
-	After *Command `json:"after"`
-}
-
-type Command struct {
-	Dir  string   `json:"dir,omitempty"`
-	Path string   `json:"path,omitempty"`
-	Envs []string `json:"envs,omitempty"`
-	Args []string `json:"args,omitempty"`
-}
-
-// Secret stores the value of a secret variable.
-type Secret struct {
-	Value string `json:"value"`
 }
 
 // type State struct {

@@ -7,14 +7,13 @@
 package cgi
 
 import (
-	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
-	"net/http"
-	"net/http/cgi"
-	"net/http/httptest"
+	"fmt"
 	"os"
-	"os/exec"
+	"path/filepath"
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/download"
@@ -23,14 +22,20 @@ import (
 
 // Config provides the driver config.
 type Config struct {
-	Artifact *task.Artifact    `json:"artifact"`
-	Method   string            `json:"method"`
-	Endpoint string            `json:"endpoint"`
-	Headers  map[string]string `json:"headers"`
-	Path     string            `json:"path"`
-	Args     []string          `json:"args"`
-	Envs     []string          `json:"envs"`
-	Dir      string            `json:"dir"`
+	Repository *task.Repository  `json:"repository"`
+	Method     string            `json:"method"`
+	Endpoint   string            `json:"endpoint"`
+	Headers    map[string]string `json:"headers"`
+	Envs       []string          `json:"envs"`
+}
+
+// getHashOfRepo constructs a hash from the repo config to figure out
+// whether it should be re-cloned.
+func getHashOfRepo(repo *task.Repository) string {
+	data := fmt.Sprintf("%s|%s|%s|%s", repo.Clone, repo.Ref, repo.Sha, repo.Download)
+	hash := sha256.New()
+	hash.Write([]byte(data))
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
 // New returns the task execution driver.
@@ -45,10 +50,8 @@ type driver struct {
 // Handle handles the task execution request.
 func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 	var (
-		log    = logger.FromContext(ctx)
-		conf   = new(Config)
-		method = "POST"
-		url    = "/"
+		log  = logger.FromContext(ctx)
+		conf = new(Config)
 	)
 
 	// decode the task configuration
@@ -57,83 +60,39 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 		return task.Error(err)
 	}
 
-	// download the artifact if provided (and if needed)
-	if conf.Artifact != nil {
-		if err := d.downloader.Download(ctx, conf.Artifact); err != nil {
-			log.Error("artifact download failed: %s", err)
+	hash := getHashOfRepo(conf.Repository)
+	cache, _ := getcache()
+	path := filepath.Join(cache, ".harness", "cache", hash)
+	_, err = os.Stat(path)
+	if err != nil {
+		// download the artifact to the destination directory
+		artifact := &download.Artifact{
+			Source:      conf.Repository,
+			Destination: path,
+		}
+		if err := d.downloader.Download(ctx, artifact); err != nil {
+			log.With("error", err).Error("artifact download failed")
 			return task.Error(err)
 		}
 	}
 
-	// set the workdir if needed
-	dir := conf.Dir
-	if dir == "" {
-		dir, _ = os.Getwd()
+	if conf.Method == "" {
+		conf.Method = "POST"
 	}
 
-	// replace XDG_CACHE_HOME if needed
-	// lookup the path if needed
-	path := expandCache(conf.Path)
-	if p, err := exec.LookPath(path); err == nil {
-		path = p
+	if conf.Endpoint == "" {
+		conf.Endpoint = "/"
 	}
 
-	// replace XDG_CACHE_HOME if needed
-	args := expandCacheSlice(conf.Args)
-
-	// create the cgi handler
-	handler := cgi.Handler{
-		Dir:  dir,
-		Path: path,
-		Args: args,
-		Env:  append(conf.Envs, os.Environ()...), // is this needed?
-
-		Logger: nil, // TODO support optional logger
-		Stderr: nil, // TODO support optional stderr
+	execer := Execer{
+		Source: path,
 	}
 
-	if conf.Method != "" {
-		method = conf.Method
-	}
-
-	if conf.Endpoint != "" {
-		url = conf.Endpoint
-	}
-
-	// create the cgi request
-	r, err := http.NewRequestWithContext(ctx, method, url,
-		bytes.NewReader(req.Task.Data),
-	)
+	resp, err := execer.Exec(ctx, conf, req.Task.Data)
 	if err != nil {
-		log.Error("cannot invoke task: %s", err)
+		log.With("error", err).Error("could not execute cgi task")
 		return task.Error(err)
 	}
 
-	for key, value := range conf.Headers {
-		r.Header.Set(key, value)
-	}
-
-	// create ethe cgi response
-	rw := httptest.NewRecorder()
-
-	log.With("cgi.dir", dir).
-		With("cgi.path", path).
-		With("cgi.args", conf.Args).
-		With("cgi.method", method).
-		With("cgi.url", url).
-		Debug("invoke cgi task")
-
-	// execute the request
-	handler.ServeHTTP(rw, r)
-
-	// check the error code and write the error
-	// to the context, if applicable.
-	// TODO should we unmarshal the response body to an error type?
-	if code := rw.Code; code > 299 {
-		return task.Errorf("received error code %d", code)
-	}
-
-	return task.Respond(
-		rw.Body.Bytes(),
-	)
+	return task.Respond(resp)
 }
