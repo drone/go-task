@@ -1,3 +1,6 @@
+// Copyright 2024 Harness Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 package cgi
 
 import (
@@ -16,46 +19,50 @@ import (
 	"github.com/drone/go-task/task/logger"
 )
 
-// TODO: We can add more fields to the execer (like stdout, stderr, env, etc)
-// but they are not being used at the moment.
 type Execer struct {
-	Source string // path to the task.yml file which contains instructions for execution
+	TaskYmlPath string  // path to the task.yml file which contains instructions for execution
+	CGIConfig   *Config // config for the cgi execution
 }
 
-// Exec parses the task.yml file and executes the task given a CGI configuration.
-func (e *Execer) Exec(ctx context.Context, conf *Config, input []byte) ([]byte, error) {
-	log := logger.FromContext(ctx)
+func newExecer(taskYmlPath string, cgiConfig *Config) *Execer {
+	return &Execer{
+		TaskYmlPath: taskYmlPath,
+		CGIConfig:   cgiConfig,
+	}
+}
 
-	out, err := ParseFile(e.Source)
+// Exec parses the task.yml file and executes the task given the input
+func (e *Execer) Exec(ctx context.Context, in []byte) ([]byte, error) {
+	log := logger.FromContext(ctx)
+	conf := e.CGIConfig
+
+	out, err := ParseFile(e.TaskYmlPath)
 	if err != nil {
 		return nil, err
 	}
 
-	goos := runtime.GOOS
-
-	// install linux dependencies
-	if goos == "linux" {
-		e.installAptDeps(ctx, out.Spec.Deps.Apt)
+	// install any dependencies for the task
+	log.Info("installing dependencies")
+	if err := e.installDeps(ctx, out.Spec.Deps); err != nil {
+		return nil, fmt.Errorf("failed to install dependencies: %w", err)
 	}
-
-	// install darwin dependencies
-	if goos == "darwin" {
-		e.installBrewDeps(ctx, out.Spec.Deps.Brew)
-	}
+	log.Info("finished installing dependencies")
 
 	var binpath string
 
-	// build go module if specified
+	// build go binary if specified
 	if out.Spec.Run.Go != nil {
 		module := out.Spec.Run.Go.Module
 		if module != "" {
-			binpath, err = e.buildGoModule(ctx, module)
+			binName := "task.exe"
+			err = e.buildGoModule(ctx, module, binName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build go module: %w", err)
 			}
+			binpath = filepath.Join(filepath.Dir(e.TaskYmlPath), binName)
 		}
 	} else if out.Spec.Run.Bash != nil {
-		binpath = filepath.Join(filepath.Dir(e.Source), out.Spec.Run.Bash.Script)
+		binpath = filepath.Join(filepath.Dir(e.TaskYmlPath), out.Spec.Run.Bash.Script)
 	} else {
 		return nil, fmt.Errorf("no execution specified in task.yml file")
 	}
@@ -71,7 +78,7 @@ func (e *Execer) Exec(ctx context.Context, conf *Config, input []byte) ([]byte, 
 	}
 
 	r, err := http.NewRequestWithContext(ctx, conf.Method, conf.Endpoint,
-		bytes.NewReader(input),
+		bytes.NewReader(in),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("cannot invoke task: %s", err)
@@ -103,51 +110,85 @@ func (e *Execer) Exec(ctx context.Context, conf *Config, input []byte) ([]byte, 
 	return rw.Body.Bytes(), nil
 }
 
-// install any linux dependencies if specified
-func (e *Execer) installAptDeps(ctx context.Context, deps []AptDep) {
-	log := logger.FromContext(ctx)
-	if len(deps) > 0 {
-		log.Debug("apt-get update")
+// installDeps installs any dependencies for the task
+func (e *Execer) installDeps(ctx context.Context, deps Deps) error {
+	goos := runtime.GOOS
 
-		cmd := exec.Command("sudo", "apt-get", "update")
-		cmd.Dir = filepath.Dir(e.Source)
-		cmd.Run()
+	// install linux dependencies
+	if goos == "linux" {
+		return e.installAptDeps(ctx, deps.Apt)
+	}
+
+	// install darwin dependencies
+	if goos == "darwin" {
+		return e.installBrewDeps(ctx, deps.Brew)
+	}
+
+	return nil
+}
+
+func (e *Execer) installAptDeps(ctx context.Context, deps []AptDep) error {
+	log := logger.FromContext(ctx)
+	var err error
+	if len(deps) > 0 {
+		log.Info("apt-get update")
+
+		cmd := e.cmdRunner("sudo", "apt-get", "update")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, dep := range deps {
-		log.Debug("apt-get install", slog.String("package", dep.Name))
+		log.Info("apt-get install", slog.String("package", dep.Name))
 
-		cmd := exec.Command("sudo", "apt-get", "install", dep.Name)
-		cmd.Dir = filepath.Dir(e.Source)
-		cmd.Run()
+		cmd := e.cmdRunner("sudo", "apt-get", "install", dep.Name)
+		if err = cmd.Run(); err != nil {
+			// TODO: perhaps errors can be logged as warnings instead of returning here,
+			// but we can evaluate this in the future.
+			return err
+		}
 	}
+
+	return nil
 }
 
-// build go module and return back path to the binary
-func (e *Execer) buildGoModule(ctx context.Context, module string) (string, error) {
-	log := logger.FromContext(ctx)
-	log.Debug("go build", slog.String("module", module))
+// cmdRunner returns a new exec.Cmd with the given name and arguments
+// It populates the working directory as the directory of the task.yml file.
+func (e *Execer) cmdRunner(name string, arg ...string) *exec.Cmd {
+	cmd := exec.Command(name, arg...)
+	cmd.Dir = filepath.Dir(e.TaskYmlPath)
+	return cmd
+}
 
-	// create binary in the same directory as the task.yml file
-	target := filepath.Join(filepath.Dir(e.Source), "task")
+func (e *Execer) buildGoModule(
+	ctx context.Context,
+	module string,
+	binName string, // name of the target binary
+) error {
+	log := logger.FromContext(ctx)
+	log.Info("go build", slog.String("module", module))
 
 	// build the code
-	cmd := exec.Command("go", "build", "-o", target, module)
-	cmd.Dir = filepath.Dir(e.Source)
+	cmd := e.cmdRunner("go", "build", "-o", binName, module)
 	if err := cmd.Run(); err != nil {
-		return "", err
+		return err
 	}
-	return target, nil
+	return nil
 }
 
-// install any brew dependencies if specified
-func (e *Execer) installBrewDeps(ctx context.Context, deps []BrewDep) {
+func (e *Execer) installBrewDeps(ctx context.Context, deps []BrewDep) error {
 	log := logger.FromContext(ctx)
 	for _, item := range deps {
-		log.Debug("brew install", slog.String("package", item.Name))
+		log.Info("brew install", slog.String("package", item.Name))
 
-		cmd := exec.Command("brew", "install", item.Name)
-		cmd.Dir = filepath.Dir(e.Source)
-		cmd.Run()
+		cmd := e.cmdRunner("brew", "install", item.Name)
+		if err := cmd.Run(); err != nil {
+			// TODO: perhaps errors can be logged as a warning instead of returning here,
+			// but we can evaluate this in the future.
+			return err
+		}
 	}
+	return nil
 }

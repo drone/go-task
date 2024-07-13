@@ -27,12 +27,25 @@ func (c *cloner) Clone(ctx context.Context, params Params) error {
 
 	if params.Ref != "" {
 		cmd = exec.CommandContext(ctx, "git", "clone", "--depth=1", "--branch="+params.Ref, params.Repo, params.Dir)
-
 	} else {
 		cmd = exec.CommandContext(ctx, "git", "clone", "--depth=1", params.Repo, params.Dir)
 	}
 
 	cmd.Stdout = c.stdout
 	cmd.Stderr = c.stderr
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	// check out the specific SHA if provided
+	if params.Sha != "" {
+		cmd = exec.CommandContext(ctx, "git", "-C", params.Dir, "checkout", params.Sha)
+		cmd.Stdout = c.stdout
+		cmd.Stderr = c.stderr
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

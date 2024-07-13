@@ -4,6 +4,8 @@
 
 package task
 
+import "encoding/json"
+
 type Task struct {
 	// ID provides a unique task identifier.
 	ID string `json:"id"`
@@ -12,14 +14,14 @@ type Task struct {
 	Type string `json:"type"`
 
 	// Data provides task execution data.
-	Data []byte `json:"data"`
+	Data json.RawMessage `json:"data"`
 
 	// Driver provides the execution driver used to
 	// execute the task.
 	Driver string `json:"driver"`
 
 	// Config provides the execution driver configuration.
-	Config []byte `json:"config"`
+	Config json.RawMessage `json:"config"`
 
 	// Forward provides instructions for forwarding
 	// the task to another runner node in the network.
@@ -71,7 +73,7 @@ type Secret struct {
 // Artifact provides the artifact used for custom
 // task execution.
 type Artifact struct {
-	Source      string            `json:"source,omitempty"`
+	Source      *Repository       `json:"source,omitempty"`
 	Destination string            `json:"destination,omitempty"`
 	Checksum    string            `json:"checksum,omitempty"`
 	Insecure    bool              `json:"insecure,omitempty"`

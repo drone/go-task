@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package cgi provides a cgi execution driver.
-
 package cgi
 
 import (
@@ -12,12 +10,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/download"
 	"github.com/drone/go-task/task/logger"
+)
+
+var (
+	taskYmlPath = "task.yml"
 )
 
 // Config provides the driver config.
@@ -65,8 +68,9 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 	path := filepath.Join(cache, ".harness", "cache", hash)
 	_, err = os.Stat(path)
 	if err != nil {
+		log.Debug("downloading the repository", slog.String("path", path))
 		// download the artifact to the destination directory
-		artifact := &download.Artifact{
+		artifact := &task.Artifact{
 			Source:      conf.Repository,
 			Destination: path,
 		}
@@ -84,11 +88,8 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 		conf.Endpoint = "/"
 	}
 
-	execer := Execer{
-		Source: path,
-	}
-
-	resp, err := execer.Exec(ctx, conf, req.Task.Data)
+	execer := newExecer(filepath.Join(path, taskYmlPath), conf)
+	resp, err := execer.Exec(ctx, req.Task.Data)
 	if err != nil {
 		log.With("error", err).Error("could not execute cgi task")
 		return task.Error(err)

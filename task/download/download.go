@@ -5,34 +5,23 @@
 package download
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
 	"github.com/drone/go-task/task/logger"
+	"github.com/mholt/archiver"
 )
-
-// Artifact provides the artifact used for custom
-// task execution. It downloads the given source repository
-// into the destination path.
-type Artifact struct {
-	Source      *task.Repository  `json:"source,omitempty"`
-	Destination string            `json:"destination,omitempty"`
-	Checksum    string            `json:"checksum,omitempty"`
-	Insecure    bool              `json:"insecure,omitempty"`
-	Header      map[string]string `json:"header,omitempty"`
-}
 
 // Downloader downloads a task artifact.
 type Downloader interface {
-	Download(context.Context, *Artifact) error
+	Download(context.Context, *task.Artifact) error
 }
 
 // New returns a downloader using the default
@@ -45,7 +34,7 @@ type downloader struct {
 	cloner cloner.Cloner
 }
 
-func (d *downloader) Download(ctx context.Context, artifact *Artifact) error {
+func (d *downloader) Download(ctx context.Context, artifact *task.Artifact) error {
 	if artifact.Source != nil {
 		if artifact.Source.Download != "" {
 			return d.download(ctx, artifact)
@@ -55,7 +44,7 @@ func (d *downloader) Download(ctx context.Context, artifact *Artifact) error {
 	return nil
 }
 
-func (d *downloader) clone(ctx context.Context, artifact *Artifact) error {
+func (d *downloader) clone(ctx context.Context, artifact *task.Artifact) error {
 	log := logger.FromContext(ctx)
 
 	dir := artifact.Destination
@@ -94,89 +83,137 @@ func (d *downloader) clone(ctx context.Context, artifact *Artifact) error {
 	return nil
 }
 
-func (d *downloader) download(_ context.Context, artifact *Artifact) error {
+func (d *downloader) download(ctx context.Context, artifact *task.Artifact) error {
+	log := logger.FromContext(ctx)
+
 	// get the target download location
 	dest := artifact.Destination
 
-	// exit if the artifact already exists
+	// exit if the directory already exists
 	if _, err := os.Stat(dest); err == nil {
+		log.With("target", dest).
+			Debug("cache hit")
 		return nil
+	} else {
+		log.With("target", dest).
+			Debug("cache miss")
 	}
 
 	// create the directory where the target is downloaded.
-	dir := filepath.Dir(dest)
-	if err := os.MkdirAll(dir, 0777); err != nil {
+	if err := os.MkdirAll(dest, 0777); err != nil {
 		return err
 	}
 
-	// unpack the .tar.gz to the target directory
-	return downloadAndUnpackTarGz(artifact.Source.Download, artifact.Destination)
+	// determine the file name and download location
+	fileName := filepath.Base(artifact.Source.Download)
+	downloadPath := filepath.Join(artifact.Destination, fileName)
+
+	if err := downloadFile(artifact.Source.Download, downloadPath); err != nil {
+		// remove the destination directory if downloading fails so it can be retried
+		os.RemoveAll(artifact.Destination)
+		return err
+	}
+
+	log.With("source", artifact.Source.Download).
+		With("destination", artifact.Destination).
+		Debug("downloaded artifact")
+
+	if err := d.unarchive(downloadPath, artifact.Destination); err != nil {
+		// remove the destination directory if unarchiving fails so it can be retried
+		os.RemoveAll(artifact.Destination)
+		return err
+	}
+
+	log.With("source", artifact.Source.Download).
+		With("destination", artifact.Destination).
+		Debug("extracted artifact")
+
+	// delete the archive file after unpacking
+	os.Remove(downloadPath)
+
+	return nil
 }
 
-// downloadAndUnpackTarGz downloads a .tar.gz file from a URL and unpacks it to a destination directory
-func downloadAndUnpackTarGz(url, destDir string) error {
-	// download the .tar.gz file
+// unarchive unpacks srcPath into destDir. It unpacks everything directly into the
+// destination directory and skips the top-level directory.
+// For example, a github repo called "myrepo" with a file "task.yml" at the root
+// will have an archive called "myrepo.zip" with the structure myrepo/task.yml.
+// If destDir is "/tmp", this will extract the archive as /tmp/task.yml similar to the
+// clone behavior.
+func (d *downloader) unarchive(srcPath, destDir string) error {
+	// create a custom walk function
+	walkFn := func(f archiver.File) error {
+		// skip directories
+		if f.IsDir() {
+			return nil
+		}
+
+		// get the relative path of the file within the archive
+		relPath := f.Name()
+
+		// split the path into components
+		pathComponents := strings.Split(relPath, string(filepath.Separator))
+
+		// if there's more than one component, remove the first one (top-level directory)
+		if len(pathComponents) > 1 {
+			relPath = filepath.Join(pathComponents[1:]...)
+		}
+
+		// construct the target file path
+		targetFile := filepath.Join(destDir, relPath)
+
+		// ensure the directory structure exists
+		err := os.MkdirAll(filepath.Dir(targetFile), 0755)
+		if err != nil {
+			return fmt.Errorf("error creating directories: %w", err)
+		}
+
+		// create the target file
+		outFile, err := os.Create(targetFile)
+		if err != nil {
+			return fmt.Errorf("error creating file: %w", err)
+		}
+		defer outFile.Close()
+
+		// copy the contents from the archive to the new file
+		_, err = io.Copy(outFile, f)
+		if err != nil {
+			return fmt.Errorf("error copying file contents: %w", err)
+		}
+
+		return nil
+	}
+
+	// open and walk through the archive
+	err := archiver.Walk(srcPath, walkFn)
+	if err != nil {
+		return fmt.Errorf("error walking through archive: %w", err)
+	}
+
+	return nil
+}
+
+// downloadFile fetches the file from url and writes it to dest
+func downloadFile(url, dest string) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to download file: %w", err)
 	}
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
+	defer resp.Body.Close()
 
 	if code := resp.StatusCode; code > 299 {
 		return fmt.Errorf("download error with status code %d", code)
 	}
 
-	// create a gzip reader
-	gzr, err := gzip.NewReader(resp.Body)
+	outFile, err := os.Create(dest)
 	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
+		return fmt.Errorf("failed to create file: %w", err)
 	}
-	if gzr != nil {
-		defer gzr.Close()
-	}
+	defer outFile.Close()
 
-	// create a tar reader
-	tr := tar.NewReader(gzr)
-
-	// unpack the tar archive
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break // end of archive
-		}
-		if err != nil {
-			return fmt.Errorf("failed to read tar entry: %w", err)
-		}
-
-		// Determine the proper path for the file/directory
-		targetPath := filepath.Join(destDir, header.Name)
-
-		// Check the type of the header
-		switch header.Typeflag {
-		case tar.TypeDir:
-			// create directory
-			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
-				return fmt.Errorf("failed to create directory: %w", err)
-			}
-		case tar.TypeReg:
-			// create file
-			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-				return fmt.Errorf("failed to create directory for file: %w", err)
-			}
-			outFile, err := os.Create(targetPath)
-			if err != nil {
-				return fmt.Errorf("failed to create file: %w", err)
-			}
-			if _, err := io.Copy(outFile, tr); err != nil {
-				outFile.Close()
-				return fmt.Errorf("failed to write file: %w", err)
-			}
-			outFile.Close()
-		default:
-			return fmt.Errorf("unsupported tar entry type: %v", header.Typeflag)
-		}
+	_, err = io.Copy(outFile, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to write to file: %w", err)
 	}
 
 	return nil
