@@ -1,0 +1,10 @@
+task:
+  deps:
+    apt:
+    - golang
+    brew:
+    - golang
+
+  run:
+    go:
+      module: github.com/drone/go-task
