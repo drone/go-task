@@ -1,9 +1,9 @@
 task:
   deps:
     apt:
-    - golang
+    - name: golang
     brew:
-    - golang
+    - name: golang
 
   run:
     go:
