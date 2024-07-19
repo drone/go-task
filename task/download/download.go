@@ -6,141 +6,229 @@ package download
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
 	"github.com/drone/go-task/task/logger"
+	"github.com/mholt/archiver"
 )
 
-// Downloader downloads a task artifact.
+// Downloader downloads a repository
+// It also takes care of where to download the repository
 type Downloader interface {
-	Download(context.Context, *task.Artifact) error
+	// returns back the download directory
+	Download(context.Context, *task.Repository) (string, error)
 }
 
-// New returns a downloader using the default
-// system cache directory
-func New(cloner cloner.Cloner) Downloader {
-	return &downloader{cloner: cloner}
+// New returns a downloader which downloads everything at the top-level
+// dir directory
+func New(cloner cloner.Cloner, dir string) Downloader {
+	return &downloader{cloner: cloner, dir: dir}
 }
 
 type downloader struct {
 	cloner cloner.Cloner
+	dir    string // top-level cache directory
 }
 
-func (d *downloader) Download(ctx context.Context, artifact *task.Artifact) error {
-	if IsRepository(artifact.Source) {
-		return d.clone(ctx, artifact)
-	} else {
-		return d.download(ctx, artifact)
+// getHashOfRepo constructs a hash from the repo config to figure out
+// whether it should be re-cloned.
+func getHashOfRepo(repo *task.Repository) string {
+	data := fmt.Sprintf("%s|%s|%s|%s", repo.Clone, repo.Ref, repo.Sha, repo.Download)
+	hash := sha256.New()
+	hash.Write([]byte(data))
+	return hex.EncodeToString(hash.Sum(nil))
+}
+
+func (d *downloader) Download(ctx context.Context, repo *task.Repository) (string, error) {
+	if repo == nil {
+		return "", errors.New("no repository provided to download")
 	}
-}
-
-func (d *downloader) clone(ctx context.Context, artifact *task.Artifact) error {
 	log := logger.FromContext(ctx)
 
-	// get the target clone directory in the cache
-	dir := ExpandCache(artifact.Destination)
-
-	// exit if the artifact already exists
-	if _, err := os.Stat(dir); err == nil {
-		log.With("target", dir).
+	dest := d.getDownloadDir(repo)
+	// exit if the artifact destination already exists
+	if _, err := os.Stat(dest); err == nil {
+		log.With("target", dest).
 			Debug("cache hit")
-		return nil
+		return dest, nil
 	} else {
-		log.With("target", dir).
+		log.With("target", dest).
 			Debug("cache miss")
 	}
 
-	// extract the clone url and ref
-	url, ref := SplitRef(artifact.Source)
+	if repo.Download != "" {
+		return dest, d.download(ctx, repo, dest)
+	}
+	return dest, d.clone(ctx, repo, dest)
+}
+
+// getDownloadDir returns the directory where the repository should be downloaded
+// It joins the top-level directory with the hash of the repository config
+func (d *downloader) getDownloadDir(repo *task.Repository) string {
+	return filepath.Join(d.dir, ".harness", "cache", getHashOfRepo(repo))
+}
+
+func (d *downloader) clone(ctx context.Context, repo *task.Repository, dest string) error {
+	log := logger.FromContext(ctx)
+
+	// extract the clone url, ref and sha
+	url := repo.Clone
+	ref := repo.Ref
+	sha := repo.Sha
 
 	log.With("source", url).
 		With("revision", ref).
-		With("target", dir).
+		With("sha", sha).
+		With("target", dest).
 		Debug("clone artifact")
 
 	// clone the repository
 	err := d.cloner.Clone(ctx, cloner.Params{
 		Repo: url,
 		Ref:  ref,
-		Dir:  dir,
+		Sha:  sha,
+		Dir:  dest,
 	})
 	if err != nil {
 		return err
 	}
 
-	scripts := artifact.Scripts
-	if scripts == nil {
-		return nil
-	}
-	after := scripts.After
-	if after == nil {
-		return nil
-	}
-
-	// execute post download commands
-	path := ExpandCache(after.Path)
-	args := ExpandCacheSlice(after.Args)
-	dir = ExpandCache(after.Dir)
-
-	// lookup the path if needed
-	if p, err := exec.LookPath(path); err == nil {
-		path = p
-	}
-
-	log.With("dir", dir).
-		With("path", path).
-		With("args", args).
-		Debug("execute after clone script")
-
-	cmd := exec.CommandContext(ctx, path, args...)
-	cmd.Dir = dir
-	cmd.Env = after.Envs
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-	return cmd.Run()
+	return nil
 }
 
-func (d *downloader) download(_ context.Context, artifact *task.Artifact) error {
-	// get the target download location
-	dest := ExpandCache(artifact.Destination)
+func (d *downloader) download(ctx context.Context, repo *task.Repository, dest string) error {
+	log := logger.FromContext(ctx)
 
-	// exit if the artifact already exists
-	if _, err := os.Stat(dest); err == nil {
+	log.With("source", repo.Download).
+		With("destination", dest).
+		Debug("downloading artifact")
+
+	// create the directory where the target is downloaded.
+	if err := os.MkdirAll(dest, 0777); err != nil {
+		return err
+	}
+
+	// determine the file name and download location
+	fileName := filepath.Base(repo.Download)
+	downloadPath := filepath.Join(dest, fileName)
+
+	if err := downloadFile(repo.Download, downloadPath); err != nil {
+		// remove the destination directory if downloading fails so it can be retried
+		os.RemoveAll(dest)
+		return err
+	}
+
+	log.With("source", repo.Download).
+		With("destination", dest).
+		Debug("downloaded artifact")
+
+	if err := d.unarchive(downloadPath, dest); err != nil {
+		// remove the destination directory if unarchiving fails so it can be retried
+		os.RemoveAll(dest)
+		return err
+	}
+
+	log.With("source", repo.Download).
+		With("destination", dest).
+		Debug("extracted artifact")
+
+	// delete the archive file after unpacking
+	os.Remove(downloadPath)
+
+	return nil
+}
+
+// unarchive unpacks srcPath into destDir. It unpacks everything directly into the
+// destination directory and skips the top-level directory.
+// For example, a github repo called "myrepo" with a file "task.yml" at the root
+// will have an archive called "myrepo.zip" with the structure myrepo/task.yml.
+// If destDir is "/tmp", this will extract the archive as /tmp/task.yml similar to the
+// clone behavior.
+func (d *downloader) unarchive(srcPath, destDir string) error {
+	// create a custom walk function
+	walkFn := func(f archiver.File) error {
+		// skip directories
+		if f.IsDir() {
+			return nil
+		}
+
+		// get the relative path of the file within the archive
+		relPath := f.Name()
+
+		// split the path into components
+		pathComponents := strings.Split(relPath, string(filepath.Separator))
+
+		// if there's more than one component, remove the first one (top-level directory)
+		if len(pathComponents) > 1 {
+			relPath = filepath.Join(pathComponents[1:]...)
+		}
+
+		// construct the target file path
+		targetFile := filepath.Join(destDir, relPath)
+
+		// ensure the directory structure exists
+		err := os.MkdirAll(filepath.Dir(targetFile), 0755)
+		if err != nil {
+			return fmt.Errorf("error creating directories: %w", err)
+		}
+
+		// create the target file
+		outFile, err := os.Create(targetFile)
+		if err != nil {
+			return fmt.Errorf("error creating file: %w", err)
+		}
+		defer outFile.Close()
+
+		// copy the contents from the archive to the new file
+		_, err = io.Copy(outFile, f)
+		if err != nil {
+			return fmt.Errorf("error copying file contents: %w", err)
+		}
+
 		return nil
 	}
 
-	// create the directory where the target is downloaded.
-	dir := filepath.Dir(dest)
-	if err := os.MkdirAll(dir, 0777); err != nil {
-		return err
+	// open and walk through the archive
+	err := archiver.Walk(srcPath, walkFn)
+	if err != nil {
+		return fmt.Errorf("error walking through archive: %w", err)
 	}
 
-	// download the artifact
-	res, err := http.Get(artifact.Source)
+	return nil
+}
+
+// downloadFile fetches the file from url and writes it to dest
+func downloadFile(url, dest string) error {
+	resp, err := http.Get(url)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to download file: %w", err)
 	}
-	if res.Body != nil {
-		defer res.Body.Close()
-	}
-	if code := res.StatusCode; code > 299 {
+	defer resp.Body.Close()
+
+	if code := resp.StatusCode; code > 299 {
 		return fmt.Errorf("download error with status code %d", code)
 	}
 
-	// read the file into memory
-	// TODO improve by writing directly to file
-	out, err := io.ReadAll(res.Body)
+	outFile, err := os.Create(dest)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer outFile.Close()
+
+	_, err = io.Copy(outFile, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to write to file: %w", err)
 	}
 
-	// write the file to disk
-	return os.WriteFile(dest, out, 0777)
+	return nil
 }

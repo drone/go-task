@@ -3,8 +3,10 @@
         "id": "67c0938c-9348-4c5e-8624-28218984e09f",
         "driver": "cgi",
         "config": {
-            "path": "go",
-            "args": ["run", "samples/get-user/main.go"]
+            "repository": {
+                "clone": "https://github.com/vistaarjuneja/user-cgi",
+                "ref": "main"
+            }
         },
         "type": "custom/user/find",
         "data": {

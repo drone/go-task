@@ -79,6 +79,11 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	// create the task downloader which downloads and
 	// caches tasks at ~/.cache/harness/task
 	downloader := download.New(
@@ -91,6 +96,9 @@ func main() {
 		// custom implementation that uses a native
 		// go git module to avoid os/exec.
 		cloner.Default(),
+
+		// top-level directory where the downloading should happen
+		cache,
 	)
 
 	// create the task router
