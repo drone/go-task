@@ -6,6 +6,9 @@ package download
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,54 +22,74 @@ import (
 	"github.com/mholt/archiver"
 )
 
-// Downloader downloads a task artifact.
+// Downloader downloads a repository
+// It also takes care of where to download the repository
 type Downloader interface {
-	Download(context.Context, *task.Artifact) error
+	// returns back the download directory
+	Download(context.Context, *task.Repository) (string, error)
 }
 
-// New returns a downloader using the default
-// system cache directory
-func New(cloner cloner.Cloner) Downloader {
-	return &downloader{cloner: cloner}
+// New returns a downloader which downloads everything at the top-level
+// dir directory
+func New(cloner cloner.Cloner, dir string) Downloader {
+	return &downloader{cloner: cloner, dir: dir}
 }
 
 type downloader struct {
 	cloner cloner.Cloner
+	dir    string // top-level cache directory
 }
 
-func (d *downloader) Download(ctx context.Context, artifact *task.Artifact) error {
-	if artifact.Source != nil {
-		if artifact.Source.Download != "" {
-			return d.download(ctx, artifact)
-		}
-		return d.clone(ctx, artifact)
+// getHashOfRepo constructs a hash from the repo config to figure out
+// whether it should be re-cloned.
+func getHashOfRepo(repo *task.Repository) string {
+	data := fmt.Sprintf("%s|%s|%s|%s", repo.Clone, repo.Ref, repo.Sha, repo.Download)
+	hash := sha256.New()
+	hash.Write([]byte(data))
+	return hex.EncodeToString(hash.Sum(nil))
+}
+
+func (d *downloader) Download(ctx context.Context, repo *task.Repository) (string, error) {
+	if repo == nil {
+		return "", errors.New("no repository provided to download")
 	}
-	return nil
-}
-
-func (d *downloader) clone(ctx context.Context, artifact *task.Artifact) error {
 	log := logger.FromContext(ctx)
 
-	dir := artifact.Destination
+	dest := d.getDownloadDir(repo)
 	// exit if the artifact destination already exists
-	if _, err := os.Stat(dir); err == nil {
-		log.With("target", dir).
+	if _, err := os.Stat(dest); err == nil {
+		log.With("target", dest).
 			Debug("cache hit")
-		return nil
+		return dest, nil
 	} else {
-		log.With("target", dir).
+		log.With("target", dest).
 			Debug("cache miss")
 	}
 
+	if repo.Download != "" {
+		return dest, d.download(ctx, repo, dest)
+	}
+	return dest, d.clone(ctx, repo, dest)
+}
+
+// getDownloadDir returns the directory where the repository should be downloaded
+// It joins the top-level directory with the hash of the repository config
+func (d *downloader) getDownloadDir(repo *task.Repository) string {
+	return filepath.Join(d.dir, ".harness", "cache", getHashOfRepo(repo))
+}
+
+func (d *downloader) clone(ctx context.Context, repo *task.Repository, dest string) error {
+	log := logger.FromContext(ctx)
+
 	// extract the clone url, ref and sha
-	url := artifact.Source.Clone
-	ref := artifact.Source.Ref
-	sha := artifact.Source.Sha
+	url := repo.Clone
+	ref := repo.Ref
+	sha := repo.Sha
 
 	log.With("source", url).
 		With("revision", ref).
 		With("sha", sha).
-		With("target", dir).
+		With("target", dest).
 		Debug("clone artifact")
 
 	// clone the repository
@@ -74,7 +97,7 @@ func (d *downloader) clone(ctx context.Context, artifact *task.Artifact) error {
 		Repo: url,
 		Ref:  ref,
 		Sha:  sha,
-		Dir:  dir,
+		Dir:  dest,
 	})
 	if err != nil {
 		return err
@@ -83,21 +106,12 @@ func (d *downloader) clone(ctx context.Context, artifact *task.Artifact) error {
 	return nil
 }
 
-func (d *downloader) download(ctx context.Context, artifact *task.Artifact) error {
+func (d *downloader) download(ctx context.Context, repo *task.Repository, dest string) error {
 	log := logger.FromContext(ctx)
 
-	// get the target download location
-	dest := artifact.Destination
-
-	// exit if the directory already exists
-	if _, err := os.Stat(dest); err == nil {
-		log.With("target", dest).
-			Debug("cache hit")
-		return nil
-	} else {
-		log.With("target", dest).
-			Debug("cache miss")
-	}
+	log.With("source", repo.Download).
+		With("destination", dest).
+		Debug("downloading artifact")
 
 	// create the directory where the target is downloaded.
 	if err := os.MkdirAll(dest, 0777); err != nil {
@@ -105,27 +119,27 @@ func (d *downloader) download(ctx context.Context, artifact *task.Artifact) erro
 	}
 
 	// determine the file name and download location
-	fileName := filepath.Base(artifact.Source.Download)
-	downloadPath := filepath.Join(artifact.Destination, fileName)
+	fileName := filepath.Base(repo.Download)
+	downloadPath := filepath.Join(dest, fileName)
 
-	if err := downloadFile(artifact.Source.Download, downloadPath); err != nil {
+	if err := downloadFile(repo.Download, downloadPath); err != nil {
 		// remove the destination directory if downloading fails so it can be retried
-		os.RemoveAll(artifact.Destination)
+		os.RemoveAll(dest)
 		return err
 	}
 
-	log.With("source", artifact.Source.Download).
-		With("destination", artifact.Destination).
+	log.With("source", repo.Download).
+		With("destination", dest).
 		Debug("downloaded artifact")
 
-	if err := d.unarchive(downloadPath, artifact.Destination); err != nil {
+	if err := d.unarchive(downloadPath, dest); err != nil {
 		// remove the destination directory if unarchiving fails so it can be retried
-		os.RemoveAll(artifact.Destination)
+		os.RemoveAll(dest)
 		return err
 	}
 
-	log.With("source", artifact.Source.Download).
-		With("destination", artifact.Destination).
+	log.With("source", repo.Download).
+		With("destination", dest).
 		Debug("extracted artifact")
 
 	// delete the archive file after unpacking

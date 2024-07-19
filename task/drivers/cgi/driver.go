@@ -6,12 +6,7 @@ package cgi
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"log/slog"
-	"os"
 	"path/filepath"
 
 	"github.com/drone/go-task/task"
@@ -30,15 +25,6 @@ type Config struct {
 	Endpoint   string            `json:"endpoint"`
 	Headers    map[string]string `json:"headers"`
 	Envs       []string          `json:"envs"`
-}
-
-// getHashOfRepo constructs a hash from the repo config to figure out
-// whether it should be re-cloned.
-func getHashOfRepo(repo *task.Repository) string {
-	data := fmt.Sprintf("%s|%s|%s|%s", repo.Clone, repo.Ref, repo.Sha, repo.Download)
-	hash := sha256.New()
-	hash.Write([]byte(data))
-	return hex.EncodeToString(hash.Sum(nil))
 }
 
 // New returns the task execution driver.
@@ -63,21 +49,10 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 		return task.Error(err)
 	}
 
-	hash := getHashOfRepo(conf.Repository)
-	cache, _ := getcache()
-	path := filepath.Join(cache, ".harness", "cache", hash)
-	_, err = os.Stat(path)
+	path, err := d.downloader.Download(ctx, conf.Repository)
 	if err != nil {
-		log.Debug("downloading the repository", slog.String("path", path))
-		// download the artifact to the destination directory
-		artifact := &task.Artifact{
-			Source:      conf.Repository,
-			Destination: path,
-		}
-		if err := d.downloader.Download(ctx, artifact); err != nil {
-			log.With("error", err).Error("artifact download failed")
-			return task.Error(err)
-		}
+		log.With("error", err).Error("artifact download failed")
+		return task.Error(err)
 	}
 
 	if conf.Method == "" {

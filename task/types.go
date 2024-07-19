@@ -70,16 +70,6 @@ type Secret struct {
 	Value string `json:"value"`
 }
 
-// Artifact provides the artifact used for custom
-// task execution.
-type Artifact struct {
-	Source      *Repository       `json:"source,omitempty"`
-	Destination string            `json:"destination,omitempty"`
-	Checksum    string            `json:"checksum,omitempty"`
-	Insecure    bool              `json:"insecure,omitempty"`
-	Header      map[string]string `json:"header,omitempty"`
-}
-
 // type State struct {
 // 	// ID provides a unique task identifier.
 // 	ID string `json:"id"`
