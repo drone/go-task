@@ -17,7 +17,7 @@ import (
 )
 
 type Execer struct {
-	Binpath   string  // path to the task.yml file which contains instructions for execution
+	Binpath   string  // path to the binary file for execution
 	CGIConfig *Config // config for the cgi execution
 }
 
