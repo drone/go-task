@@ -28,7 +28,7 @@ func newExecer(binpath string, cgiConfig *Config) *Execer {
 	}
 }
 
-// Exec parses the task.yml file and executes the task given the input
+// Exec executes the task given the binary filepath and the configuration
 func (e *Execer) Exec(ctx context.Context, in []byte) ([]byte, error) {
 	log := logger.FromContext(ctx)
 	conf := e.CGIConfig

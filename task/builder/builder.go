@@ -21,6 +21,7 @@ func New(taskYmlPath string) *Builder {
 	}
 }
 
+// Build parses the task.yml file and generates the executable binary for a task
 func (b *Builder) Build(ctx context.Context) (string, error) {
 	log := logger.FromContext(ctx)
 	out, err := ParseFile(b.TaskYmlPath)
