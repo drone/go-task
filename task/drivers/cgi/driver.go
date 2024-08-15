@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/drone/go-task/task"
+	"github.com/drone/go-task/task/builder"
 	"github.com/drone/go-task/task/download"
 	"github.com/drone/go-task/task/logger"
 )
@@ -63,7 +64,12 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 		conf.Endpoint = "/"
 	}
 
-	execer := newExecer(filepath.Join(path, taskYmlPath), conf)
+	builder := builder.New(filepath.Join(path, taskYmlPath))
+	binpath, err := builder.Build(ctx)
+	if err != nil {
+		log.With("error", err).Error("task build failed")
+	}
+	execer := newExecer(binpath, conf)
 	resp, err := execer.Exec(ctx, req.Task.Data)
 	if err != nil {
 		log.With("error", err).Error("could not execute cgi task")
