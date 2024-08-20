@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -51,6 +52,11 @@ func (b *Builder) Build(ctx context.Context) (string, error) {
 		}
 	} else if out.Spec.Run.Bash != nil {
 		binpath = filepath.Join(filepath.Dir(b.TaskYmlPath), out.Spec.Run.Bash.Script)
+	} else if out.Spec.Run.Exec != nil {
+		binpath, err = b.handleExecutableFile(*out.Spec.Run.Exec)
+		if err != nil {
+			return "", err
+		}
 	} else {
 		return "", fmt.Errorf("no execution specified in task.yml file")
 	}
@@ -138,4 +144,18 @@ func (b *Builder) installBrewDeps(ctx context.Context, deps []BrewDep) error {
 		}
 	}
 	return nil
+}
+
+func (b *Builder) handleExecutableFile(m map[string]string) (string, error) {
+	osWithArch := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+	binName, ok := m[osWithArch]
+	if !ok {
+		return "", fmt.Errorf("os and architecture [%s] is not specified in task.yml file", osWithArch)
+	}
+	binpath := filepath.Join(filepath.Dir(b.TaskYmlPath), binName)
+	err := os.Chmod(binpath, 0700)
+	if err != nil {
+		return "", fmt.Errorf("failed to set executable flag in task file [%s]: %w", binpath, err)
+	}
+	return binpath, nil
 }

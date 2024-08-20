@@ -41,8 +41,9 @@ type BrewDep struct {
 
 // Run represents the run configuration
 type Run struct {
-	Go   *Go   `json:"go"`
-	Bash *Bash `json:"bash"`
+	Go   *Go                `json:"go"`
+	Bash *Bash              `json:"bash"`
+	Exec *map[string]string `json:"exec"`
 }
 
 type Bash struct {
