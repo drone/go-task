@@ -146,6 +146,8 @@ func (b *Builder) installBrewDeps(ctx context.Context, deps []BrewDep) error {
 	return nil
 }
 
+// handleExecutableFile will resolve the full path of the task's binary executable;
+// it will also use `chmod` to set the "executable" flag to this file.
 func (b *Builder) handleExecutableFile(m map[string]string) (string, error) {
 	osWithArch := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	binName, ok := m[osWithArch]
