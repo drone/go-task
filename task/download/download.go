@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/drone/go-task/task"
@@ -26,7 +27,7 @@ import (
 // It also takes care of where to download the repository
 type Downloader interface {
 	// returns back the download directory
-	Download(context.Context, *task.Repository) (string, error)
+	Download(context.Context, *task.Repository, *task.ExecutableUrls) (string, error)
 }
 
 // New returns a downloader which downloads everything at the top-level
@@ -44,38 +45,64 @@ type downloader struct {
 // whether it should be re-cloned.
 func getHashOfRepo(repo *task.Repository) string {
 	data := fmt.Sprintf("%s|%s|%s|%s", repo.Clone, repo.Ref, repo.Sha, repo.Download)
+	return getHash(data)
+}
+
+func getHash(s string) string {
 	hash := sha256.New()
-	hash.Write([]byte(data))
+	hash.Write([]byte(s))
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func (d *downloader) Download(ctx context.Context, repo *task.Repository) (string, error) {
-	if repo == nil {
-		return "", errors.New("no repository provided to download")
+func (d *downloader) Download(ctx context.Context, repo *task.Repository, urls *task.ExecutableUrls) (string, error) {
+	if urls != nil {
+		return d.handleDownloadExecutable(ctx, urls)
+	} else if repo != nil {
+		return d.handleDownloadRepo(ctx, repo)
 	}
-	log := logger.FromContext(ctx)
+	return "", errors.New("no repository or executable urls provided to download")
+}
 
+func (d *downloader) handleDownloadExecutable(ctx context.Context, urls *task.ExecutableUrls) (string, error) {
+	osWithArch := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+	url, ok := (*urls)[osWithArch]
+	if !ok {
+		return "", fmt.Errorf("os and architecture [%s] is not specified in task.yml file", osWithArch)
+	}
+
+	dest := filepath.Join(d.getBaseDownloadDir(), getHash(url))
+
+	if cacheHit := d.isCacheHit(ctx, dest); cacheHit {
+		// exit if the artifact destination already exists
+		return d.getDownloadPath(url, dest), nil
+	}
+
+	binpath, err := d.downloadFile(ctx, url, dest)
+	if err != nil {
+		// remove the destination directory if downloading fails so it can be retried
+		os.RemoveAll(dest)
+		return "", err
+	}
+
+	err = os.Chmod(binpath, 0777)
+	if err != nil {
+		return "", fmt.Errorf("failed to set executable flag in task file [%s]: %w", binpath, err)
+	}
+	return binpath, nil
+}
+
+func (d *downloader) handleDownloadRepo(ctx context.Context, repo *task.Repository) (string, error) {
 	dest := d.getDownloadDir(repo)
-	// exit if the artifact destination already exists
-	if _, err := os.Stat(dest); err == nil {
-		log.With("target", dest).
-			Debug("cache hit")
+
+	if cacheHit := d.isCacheHit(ctx, dest); cacheHit {
+		// exit if the artifact destination already exists
 		return dest, nil
-	} else {
-		log.With("target", dest).
-			Debug("cache miss")
 	}
 
 	if repo.Download != "" {
-		return dest, d.download(ctx, repo, dest)
+		return dest, d.downloadRepo(ctx, repo, dest)
 	}
 	return dest, d.clone(ctx, repo, dest)
-}
-
-// getDownloadDir returns the directory where the repository should be downloaded
-// It joins the top-level directory with the hash of the repository config
-func (d *downloader) getDownloadDir(repo *task.Repository) string {
-	return filepath.Join(d.dir, ".harness", "cache", getHashOfRepo(repo))
 }
 
 func (d *downloader) clone(ctx context.Context, repo *task.Repository, dest string) error {
@@ -106,31 +133,15 @@ func (d *downloader) clone(ctx context.Context, repo *task.Repository, dest stri
 	return nil
 }
 
-func (d *downloader) download(ctx context.Context, repo *task.Repository, dest string) error {
+func (d *downloader) downloadRepo(ctx context.Context, repo *task.Repository, dest string) error {
 	log := logger.FromContext(ctx)
 
-	log.With("source", repo.Download).
-		With("destination", dest).
-		Debug("downloading artifact")
-
-	// create the directory where the target is downloaded.
-	if err := os.MkdirAll(dest, 0777); err != nil {
-		return err
-	}
-
-	// determine the file name and download location
-	fileName := filepath.Base(repo.Download)
-	downloadPath := filepath.Join(dest, fileName)
-
-	if err := downloadFile(repo.Download, downloadPath); err != nil {
+	downloadPath, err := d.downloadFile(ctx, repo.Download, dest)
+	if err != nil {
 		// remove the destination directory if downloading fails so it can be retried
 		os.RemoveAll(dest)
 		return err
 	}
-
-	log.With("source", repo.Download).
-		With("destination", dest).
-		Debug("downloaded artifact")
 
 	if err := d.unarchive(downloadPath, dest); err != nil {
 		// remove the destination directory if unarchiving fails so it can be retried
@@ -208,27 +219,76 @@ func (d *downloader) unarchive(srcPath, destDir string) error {
 }
 
 // downloadFile fetches the file from url and writes it to dest
-func downloadFile(url, dest string) error {
+func (d *downloader) downloadFile(ctx context.Context, url, dest string) (string, error) {
+	log := logger.FromContext(ctx)
+
+	log.With("source", url).
+		With("destination", dest).
+		Debug("downloading artifact")
+
+	// create the directory where the target is downloaded.
+	if err := os.MkdirAll(dest, 0777); err != nil {
+		return "", err
+	}
+
+	// determine the file name and download location
+	downloadPath := d.getDownloadPath(url, dest)
+
 	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("failed to download file: %w", err)
+		return "", fmt.Errorf("failed to download file: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if code := resp.StatusCode; code > 299 {
-		return fmt.Errorf("download error with status code %d", code)
+		return "", fmt.Errorf("download error with status code %d", code)
 	}
 
-	outFile, err := os.Create(dest)
+	outFile, err := os.Create(downloadPath)
 	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
+		return "", fmt.Errorf("failed to create file: %w", err)
 	}
 	defer outFile.Close()
 
 	_, err = io.Copy(outFile, resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to write to file: %w", err)
+		return "", fmt.Errorf("failed to write to file: %w", err)
 	}
 
-	return nil
+	log.With("source", url).
+		With("destination", downloadPath).
+		Debug("downloaded artifact")
+
+	return downloadPath, nil
+}
+
+// getDownloadPath returns the full download path given the download url and the destination folder `dest`
+func (d *downloader) getDownloadPath(url, dest string) string {
+	fileName := filepath.Base(url)
+	return filepath.Join(dest, fileName)
+}
+
+// getDownloadDir returns the directory where the repository should be downloaded
+// It joins the top-level directory with the hash of the repository config
+func (d *downloader) getDownloadDir(repo *task.Repository) string {
+	return filepath.Join(d.getBaseDownloadDir(), getHashOfRepo(repo))
+}
+
+// getBaseDownloadDir returns the top-level directory where all files should be downloaded
+func (d *downloader) getBaseDownloadDir() string {
+	return filepath.Join(d.dir, ".harness", "cache")
+}
+
+func (d *downloader) isCacheHit(ctx context.Context, dest string) bool {
+	log := logger.FromContext(ctx)
+
+	if _, err := os.Stat(dest); err == nil {
+		log.With("target", dest).
+			Debug("cache hit")
+		return true
+	}
+
+	log.With("target", dest).
+		Debug("cache miss")
+	return false
 }

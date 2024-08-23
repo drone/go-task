@@ -63,6 +63,9 @@ type Repository struct {
 	Download string `json:"download"`
 }
 
+// ExecutableUrls is a map of os/arch to URLs where the binary executable can be downloaded
+type ExecutableUrls map[string]string
+
 // Secret stores the value of a secret variable.
 type Secret struct {
 	Value string `json:"value"`
