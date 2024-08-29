@@ -29,7 +29,7 @@ import (
 // It also takes care of where to download the repository
 type Downloader interface {
 	// returns back the download directory
-	Download(context.Context, *task.Repository, *task.Executable) (string, error)
+	Download(context.Context, string, *task.Repository, *task.Executable) (string, error)
 }
 
 // New returns a downloader which downloads everything at the top-level
@@ -56,23 +56,23 @@ func getHash(s string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func (d *downloader) Download(ctx context.Context, repo *task.Repository, exec *task.Executable) (string, error) {
+func (d *downloader) Download(ctx context.Context, taskType string, repo *task.Repository, exec *task.Executable) (string, error) {
 	if exec != nil {
-		return d.handleDownloadExecutable(ctx, exec)
+		return d.handleDownloadExecutable(ctx, taskType, exec)
 	} else if repo != nil {
 		return d.handleDownloadRepo(ctx, repo)
 	}
 	return "", errors.New("no repository or executable urls provided to download")
 }
 
-func (d *downloader) handleDownloadExecutable(ctx context.Context, exec *task.Executable) (string, error) {
+func (d *downloader) handleDownloadExecutable(ctx context.Context, taskType string, exec *task.Executable) (string, error) {
 	osWithArch := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	url, ok := (exec.Urls)[osWithArch]
 	if !ok {
 		return "", fmt.Errorf("os and architecture [%s] is not specified in Executable's urls map", osWithArch)
 	}
 
-	dest := filepath.Join(d.getBaseDownloadDir(), exec.Type, exec.Version)
+	dest := filepath.Join(d.getBaseDownloadDir(), taskType, exec.Version)
 
 	if cacheHit := d.isCacheHit(ctx, dest); cacheHit {
 		// exit if the artifact destination already exists
@@ -81,7 +81,7 @@ func (d *downloader) handleDownloadExecutable(ctx context.Context, exec *task.Ex
 
 	// if no cache hit, remove all downloaded executables for this task's type
 	// so that we don't keep multiple executables of the same type
-	err := os.RemoveAll(filepath.Join(d.getBaseDownloadDir(), exec.Type))
+	err := os.RemoveAll(filepath.Join(d.getBaseDownloadDir(), taskType))
 	if err != nil {
 		return "", err
 	}

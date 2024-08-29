@@ -51,7 +51,7 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 		return task.Error(err)
 	}
 
-	path, err := d.downloader.Download(ctx, conf.Repository, conf.Executable)
+	path, err := d.downloader.Download(ctx, req.Task.Type, conf.Repository, conf.Executable)
 	if err != nil {
 		log.With("error", err).Error("artifact download failed")
 		return task.Error(err)

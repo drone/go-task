@@ -66,7 +66,6 @@ type Repository struct {
 // Executable provides the details to download
 // a custom binary task executable file
 type Executable struct {
-	Type    string            `json:"type"`
 	Urls    map[string]string `json:"urls"`
 	Version string            `json:"version"`
 }
