@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
@@ -27,7 +29,7 @@ import (
 // It also takes care of where to download the repository
 type Downloader interface {
 	// returns back the download directory
-	Download(context.Context, *task.Repository, *task.ExecutableUrls) (string, error)
+	Download(context.Context, *task.Repository, *task.Executable) (string, error)
 }
 
 // New returns a downloader which downloads everything at the top-level
@@ -54,27 +56,34 @@ func getHash(s string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func (d *downloader) Download(ctx context.Context, repo *task.Repository, urls *task.ExecutableUrls) (string, error) {
-	if urls != nil {
-		return d.handleDownloadExecutable(ctx, urls)
+func (d *downloader) Download(ctx context.Context, repo *task.Repository, exec *task.Executable) (string, error) {
+	if exec != nil {
+		return d.handleDownloadExecutable(ctx, exec)
 	} else if repo != nil {
 		return d.handleDownloadRepo(ctx, repo)
 	}
 	return "", errors.New("no repository or executable urls provided to download")
 }
 
-func (d *downloader) handleDownloadExecutable(ctx context.Context, urls *task.ExecutableUrls) (string, error) {
+func (d *downloader) handleDownloadExecutable(ctx context.Context, exec *task.Executable) (string, error) {
 	osWithArch := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
-	url, ok := (*urls)[osWithArch]
+	url, ok := (exec.Urls)[osWithArch]
 	if !ok {
-		return "", fmt.Errorf("os and architecture [%s] is not specified in task.yml file", osWithArch)
+		return "", fmt.Errorf("os and architecture [%s] is not specified in Executable's urls map", osWithArch)
 	}
 
-	dest := filepath.Join(d.getBaseDownloadDir(), getHash(url))
+	dest := filepath.Join(d.getBaseDownloadDir(), exec.Type, exec.Version)
 
 	if cacheHit := d.isCacheHit(ctx, dest); cacheHit {
 		// exit if the artifact destination already exists
 		return d.getDownloadPath(url, dest), nil
+	}
+
+	// if no cache hit, remove all downloaded executables for this task's type
+	// so that we don't keep multiple executables of the same type
+	err := os.RemoveAll(filepath.Join(d.getBaseDownloadDir(), exec.Type))
+	if err != nil {
+		return "", err
 	}
 
 	binpath, err := d.downloadFile(ctx, url, dest)
@@ -83,6 +92,7 @@ func (d *downloader) handleDownloadExecutable(ctx context.Context, urls *task.Ex
 		os.RemoveAll(dest)
 		return "", err
 	}
+	d.logExecutableDownload(ctx, exec, osWithArch)
 
 	err = os.Chmod(binpath, 0777)
 	if err != nil {
@@ -291,4 +301,26 @@ func (d *downloader) isCacheHit(ctx context.Context, dest string) bool {
 	log.With("target", dest).
 		Debug("cache miss")
 	return false
+}
+
+func (d *downloader) logExecutableDownload(ctx context.Context, exec *task.Executable, osWithArch string) {
+	log := logger.FromContext(ctx)
+	filename := "executable_downloads.log"
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Error(fmt.Sprintf("Failed to open log file [%s]: %v", filename, err))
+	}
+	defer file.Close()
+
+	// Convert the struct to JSON
+	data, err := json.Marshal(exec)
+	if err != nil {
+		log.Error(fmt.Sprintf("Failed to marshall Executable struct to json: %v", err))
+	}
+
+	entry := fmt.Sprintf("%s: dowloaded for [%s] %s\n", time.Now().Format(time.RFC3339), osWithArch, string(data))
+	// Write the JSON string to the file, followed by a newline
+	if _, err := file.WriteString(entry); err != nil {
+		log.Error(fmt.Sprintf("Failed to write Executable struct to log file [%s]: %v", filename, err))
+	}
 }
