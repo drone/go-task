@@ -289,6 +289,7 @@ func (d *downloader) getBaseDownloadDir() string {
 	return filepath.Join(d.dir, ".harness", "cache")
 }
 
+// isCacheHit checks if the `dest` folder already exists
 func (d *downloader) isCacheHit(ctx context.Context, dest string) bool {
 	log := logger.FromContext(ctx)
 
@@ -303,6 +304,7 @@ func (d *downloader) isCacheHit(ctx context.Context, dest string) bool {
 	return false
 }
 
+// logExecutableDownload writes details about the Executable struct used to download a task's executable file
 func (d *downloader) logExecutableDownload(ctx context.Context, exec *task.Executable, osWithArch string) {
 	log := logger.FromContext(ctx)
 	filename := "executable_downloads.log"
