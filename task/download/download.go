@@ -25,8 +25,8 @@ import (
 	"github.com/mholt/archiver"
 )
 
-// Downloader downloads a repository
-// It also takes care of where to download the repository
+// Downloader downloads a repository or a binary executable file
+// It also takes care of where to download the repository or file
 type Downloader interface {
 	// returns back the download directory
 	Download(context.Context, string, *task.Repository, *task.Executable) (string, error)
