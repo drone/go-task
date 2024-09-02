@@ -11,14 +11,18 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TextEval(t *testing.T) {
+func TestEval(t *testing.T) {
 	var jsondata = []byte(`{
 		"static": "value",
 		"array": [
 			{"static": "value"},
-			{"token":  "${{secrets.c94f469b-d84e-4489-9f10-b6b38a7e6023}}"}
+			{"token":  "${{secrets.c94f469b-d84e-4489-9f10-b6b38a7e6023}}"},
+			{"base64EncodedToken":  "${{getAsBase64(${{secrets.c94f469b-d84e-4489-9f10-b6b38a7e6023}})}}"}
 		],
-		"token": "${{secrets.c94f469b-d84e-4489-9f10-b6b38a7e6023}}"
+		"token": "${{secrets.c94f469b-d84e-4489-9f10-b6b38a7e6023}}",
+                "tokenBase64Encoded": "this is my token: ${{getAsBase64(${{secrets.c94f469b-d84e-4489-9f10-b6b38a7e6023}})}}",
+                "mapBase64Encoded": "${{getAsBase64({'key1':'value1','key2':'value2'})}}",
+                "emptyBase64Encoded": "${{getAsBase64()}}"
 	}`)
 
 	var data = map[string]string{
@@ -35,8 +39,12 @@ func TextEval(t *testing.T) {
 		"array": []any{
 			map[string]any{"static": "value"},
 			map[string]any{"token": "9f105c56f29e4489"},
+			map[string]any{"base64EncodedToken": "OWYxMDVjNTZmMjllNDQ4OQ=="},
 		},
-		"token": "9f105c56f29e4489",
+		"token":              "9f105c56f29e4489",
+		"tokenBase64Encoded": "this is my token: OWYxMDVjNTZmMjllNDQ4OQ==",
+		"mapBase64Encoded":   "eydrZXkxJzondmFsdWUxJywna2V5Mic6J3ZhbHVlMid9",
+		"emptyBase64Encoded": "",
 	}
 	if diff := cmp.Diff(got, want); len(diff) != 0 {
 		t.Error("Unexpected input expansion")
