@@ -7,7 +7,11 @@
 
 package evaler
 
-import "strings"
+import (
+	"encoding/base64"
+	"regexp"
+	"strings"
+)
 
 // Eval evaluates expressions in the map structure.
 func Eval(data map[string]any, secrets map[string]string) {
@@ -22,13 +26,8 @@ func Eval(data map[string]any, secrets map[string]string) {
 			if !strings.Contains(v, "${{") {
 				return
 			}
-			// HACK(bradrydzewski) find/replace secrets
-			// until we have proper expression support.
-			for key, value := range secrets {
-				a := "${{secrets." + key + "}}"
-				b := value
-				v = strings.ReplaceAll(v, a, b)
-			}
+			v = resolveSecrets(v, secrets)
+			v = resolveGetAsBase64(v)
 			return true, v
 		case []any:
 			for i := 0; i < len(v); i++ {
@@ -48,4 +47,31 @@ func Eval(data map[string]any, secrets map[string]string) {
 
 	// walk the map
 	walk(data)
+}
+
+func resolveSecrets(s string, secrets map[string]string) string {
+	// HACK(bradrydzewski) find/replace secrets
+	// until we have proper expression support.
+	for key, value := range secrets {
+		a := "${{secrets." + key + "}}"
+		b := value
+		s = strings.ReplaceAll(s, a, b)
+	}
+	return s
+}
+
+func resolveGetAsBase64(s string) string {
+	// regex to match the pattern ${{getAsBase64(...)}}
+	re := regexp.MustCompile(`\$\{\{getAsBase64\((.*?)\)\}\}`)
+
+	// replace the matched strings with their base64-encoded values
+	return re.ReplaceAllStringFunc(s, func(match string) string {
+		// extract the string wrapped by ${{getAsBase64(...)}}
+		submatch := re.FindStringSubmatch(match)
+		if len(submatch) > 1 {
+			// Encode it to to base64
+			return base64.StdEncoding.EncodeToString([]byte(submatch[1]))
+		}
+		return match
+	})
 }
