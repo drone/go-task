@@ -21,6 +21,7 @@ var (
 
 // Config provides the driver config.
 type Config struct {
+	Executable *task.Executable  `json:"executable"`
 	Repository *task.Repository  `json:"repository"`
 	Method     string            `json:"method"`
 	Endpoint   string            `json:"endpoint"`
@@ -50,7 +51,7 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 		return task.Error(err)
 	}
 
-	path, err := d.downloader.Download(ctx, conf.Repository)
+	path, err := d.downloader.Download(ctx, req.Task.Type, conf.Repository, conf.Executable)
 	if err != nil {
 		log.With("error", err).Error("artifact download failed")
 		return task.Error(err)
@@ -64,10 +65,16 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 		conf.Endpoint = "/"
 	}
 
-	builder := builder.New(filepath.Join(path, taskYmlPath))
-	binpath, err := builder.Build(ctx)
-	if err != nil {
-		log.With("error", err).Error("task build failed")
+	var binpath string
+	if conf.Executable != nil {
+		// if an executable is downloaded directly via url, no need to use `builder`
+		binpath = path
+	} else {
+		builder := builder.New(filepath.Join(path, taskYmlPath))
+		binpath, err = builder.Build(ctx)
+		if err != nil {
+			log.With("error", err).Error("task build failed")
+		}
 	}
 	execer := newExecer(binpath, conf)
 	resp, err := execer.Exec(ctx, req.Task.Data)
