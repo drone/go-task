@@ -29,7 +29,7 @@ import (
 // It also takes care of where to download the repository or file
 type Downloader interface {
 	// returns back the download directory
-	Download(context.Context, string, *task.Repository, *task.Executable) (string, error)
+	Download(context.Context, string, *task.Repository, *task.ExecutableConfig) (string, error)
 }
 
 // New returns a downloader which downloads everything at the top-level
@@ -56,7 +56,7 @@ func getHash(s string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func (d *downloader) Download(ctx context.Context, taskType string, repo *task.Repository, exec *task.Executable) (string, error) {
+func (d *downloader) Download(ctx context.Context, taskType string, repo *task.Repository, exec *task.ExecutableConfig) (string, error) {
 	if exec != nil {
 		return d.handleDownloadExecutable(ctx, taskType, exec)
 	} else if repo != nil {
@@ -65,11 +65,12 @@ func (d *downloader) Download(ctx context.Context, taskType string, repo *task.R
 	return "", errors.New("no repository or executable urls provided to download")
 }
 
-func (d *downloader) handleDownloadExecutable(ctx context.Context, taskType string, exec *task.Executable) (string, error) {
-	osWithArch := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
-	url, ok := (exec.Urls)[osWithArch]
+func (d *downloader) handleDownloadExecutable(ctx context.Context, taskType string, exec *task.ExecutableConfig) (string, error) {
+	operatingSystem := runtime.GOOS
+	architecture := runtime.GOARCH
+	url, ok := d.getExecutableUrl(exec, operatingSystem, architecture)
 	if !ok {
-		return "", fmt.Errorf("os and architecture [%s] is not specified in Executable's urls map", osWithArch)
+		return "", fmt.Errorf("os [%s] and architecture [%s] are not specified in executable configuration", operatingSystem, architecture)
 	}
 
 	dest := filepath.Join(d.getBaseDownloadDir(), taskType, exec.Version)
@@ -92,7 +93,7 @@ func (d *downloader) handleDownloadExecutable(ctx context.Context, taskType stri
 		os.RemoveAll(dest)
 		return "", err
 	}
-	d.logExecutableDownload(ctx, exec, osWithArch)
+	d.logExecutableDownload(ctx, exec, operatingSystem, architecture)
 
 	err = os.Chmod(binpath, 0777)
 	if err != nil {
@@ -304,8 +305,19 @@ func (d *downloader) isCacheHit(ctx context.Context, dest string) bool {
 	return false
 }
 
+// getExecutableUrl fetches the download url for a task's executable file,
+// given the current system's operating system and architecture
+func (d *downloader) getExecutableUrl(config *task.ExecutableConfig, operatingSystem, architecture string) (string, bool) {
+	for _, exec := range config.Executables {
+		if exec.Os == operatingSystem && exec.Arch == architecture {
+			return exec.Url, true
+		}
+	}
+	return "", false
+}
+
 // logExecutableDownload writes details about the Executable struct used to download a task's executable file
-func (d *downloader) logExecutableDownload(ctx context.Context, exec *task.Executable, osWithArch string) {
+func (d *downloader) logExecutableDownload(ctx context.Context, exec *task.ExecutableConfig, operatingSystem, architecture string) {
 	log := logger.FromContext(ctx)
 	filename := "executable_downloads.log"
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -320,7 +332,7 @@ func (d *downloader) logExecutableDownload(ctx context.Context, exec *task.Execu
 		log.Error(fmt.Sprintf("Failed to marshall Executable struct to json: %v", err))
 	}
 
-	entry := fmt.Sprintf("%s: dowloaded for [%s] %s\n", time.Now().Format(time.RFC3339), osWithArch, string(data))
+	entry := fmt.Sprintf("%s: dowloaded for os: [%s], arch: [%s] %s\n", time.Now().Format(time.RFC3339), operatingSystem, architecture, string(data))
 	// Write the JSON string to the file, followed by a newline
 	if _, err := file.WriteString(entry); err != nil {
 		log.Error(fmt.Sprintf("Failed to write Executable struct to log file [%s]: %v", filename, err))

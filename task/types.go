@@ -63,11 +63,21 @@ type Repository struct {
 	Download string `json:"download"`
 }
 
-// Executable provides the details to download
-// a custom binary task executable file
+// ExecutableConfig provides the details to download
+// a custom binary task executable file, for all
+// supported operating systems and architectures
+type ExecutableConfig struct {
+	Executables []Executable `json:"executables"`
+	Version     string       `json:"version"`
+}
+
+// Executable provides the url to download
+// a custom binary task executable file,
+// given the operating system and architecture
 type Executable struct {
-	Urls    map[string]string `json:"urls"`
-	Version string            `json:"version"`
+	Arch string `json:"arch"`
+	Os   string `json:"os"`
+	Url  string `json:"url"`
 }
 
 // Secret stores the value of a secret variable.
