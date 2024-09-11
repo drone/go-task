@@ -21,6 +21,7 @@ func TestEval(t *testing.T) {
 		],
 		"token": "${{secrets.c94f469b-d84e-4489-9f10-b6b38a7e6023}}",
                 "tokenBase64Encoded": "this is my token: ${{getAsBase64(${{secrets.c94f469b-d84e-4489-9f10-b6b38a7e6023}})}}",
+                "multilineStringBase64Encoded": "this is my string: ${{getAsBase64(value1\nvalue2\nvalue3)}}",
                 "mapBase64Encoded": "${{getAsBase64({'key1':'value1','key2':'value2'})}}",
                 "emptyBase64Encoded": "${{getAsBase64()}}"
 	}`)
@@ -41,10 +42,11 @@ func TestEval(t *testing.T) {
 			map[string]any{"token": "9f105c56f29e4489"},
 			map[string]any{"base64EncodedToken": "OWYxMDVjNTZmMjllNDQ4OQ=="},
 		},
-		"token":              "9f105c56f29e4489",
-		"tokenBase64Encoded": "this is my token: OWYxMDVjNTZmMjllNDQ4OQ==",
-		"mapBase64Encoded":   "eydrZXkxJzondmFsdWUxJywna2V5Mic6J3ZhbHVlMid9",
-		"emptyBase64Encoded": "",
+		"token":                        "9f105c56f29e4489",
+		"tokenBase64Encoded":           "this is my token: OWYxMDVjNTZmMjllNDQ4OQ==",
+		"multilineStringBase64Encoded": "this is my string: dmFsdWUxCnZhbHVlMgp2YWx1ZTM=",
+		"mapBase64Encoded":             "eydrZXkxJzondmFsdWUxJywna2V5Mic6J3ZhbHVlMid9",
+		"emptyBase64Encoded":           "",
 	}
 	if diff := cmp.Diff(got, want); len(diff) != 0 {
 		t.Error("Unexpected input expansion")

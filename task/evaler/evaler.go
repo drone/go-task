@@ -62,7 +62,8 @@ func resolveSecrets(s string, secrets map[string]string) string {
 
 func resolveGetAsBase64(s string) string {
 	// regex to match the pattern ${{getAsBase64(...)}}
-	re := regexp.MustCompile(`\$\{\{getAsBase64\((.*?)\)\}\}`)
+	// the (?s) modifier will make the `.` also match line breaks ("\n")
+	re := regexp.MustCompile(`(?s)\$\{\{getAsBase64\((.*?)\)\}\}`)
 
 	// replace the matched strings with their base64-encoded values
 	return re.ReplaceAllStringFunc(s, func(match string) string {
