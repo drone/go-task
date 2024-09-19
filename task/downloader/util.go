@@ -13,10 +13,10 @@ import (
 	"github.com/drone/go-task/task/logger"
 )
 
-// getcache as a function for mocking
+// getcacheFn as a function for mocking
 var getcacheFn = os.UserCacheDir
 
-// httpGet as a function for mocking
+// httpGetFn as a function for mocking
 var httpGetFn = http.Get
 
 // isCacheHitFn as a function for mocking
