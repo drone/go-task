@@ -15,7 +15,7 @@ import (
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
-	"github.com/drone/go-task/task/download"
+	"github.com/drone/go-task/task/downloader"
 	"github.com/drone/go-task/task/drivers/cgi"
 )
 
@@ -86,7 +86,7 @@ func main() {
 
 	// create the task downloader which downloads and
 	// caches tasks at ~/.cache/harness/task
-	downloader := download.New(
+	downloader := downloader.New(
 		// use the built-in cloner which uses
 		// os/exec to clone the repository.
 		//

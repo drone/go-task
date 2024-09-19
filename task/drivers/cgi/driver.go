@@ -11,7 +11,7 @@ import (
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/builder"
-	"github.com/drone/go-task/task/download"
+	"github.com/drone/go-task/task/downloader"
 	"github.com/drone/go-task/task/logger"
 )
 
@@ -30,12 +30,12 @@ type Config struct {
 }
 
 // New returns the task execution driver.
-func New(d download.Downloader) task.Handler {
+func New(d downloader.Downloader) task.Handler {
 	return &driver{downloader: d}
 }
 
 type driver struct {
-	downloader download.Downloader
+	downloader downloader.Downloader
 }
 
 // Handle handles the task execution request.
@@ -51,7 +51,7 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 		return task.Error(err)
 	}
 
-	path, err := d.downloader.Download(ctx, req.Task.Type, conf.Repository, conf.ExecutableConfig)
+	path, err := d.downloader.DownloadRepo(ctx, conf.Repository)
 	if err != nil {
 		log.With("error", err).Error("artifact download failed")
 		return task.Error(err)
