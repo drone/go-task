@@ -60,7 +60,7 @@ func (e *executableDownloader) download(ctx context.Context, dir string, taskTyp
 	binpath, err := downloadFileFn(ctx, url, dest)
 	if err != nil {
 		// remove the destination directory if downloading fails so it can be retried
-		removeAllFn(dest)
+		removeAllFn(destDir)
 		return "", err
 	}
 	e.logExecutableDownload(ctx, exec, operatingSystem, architecture)
