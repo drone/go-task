@@ -13,17 +13,16 @@ import (
 	"github.com/drone/go-task/task/logger"
 )
 
-// getcacheFn as a function for mocking
-var getcacheFn = os.UserCacheDir
-
-// httpGetFn as a function for mocking
-var httpGetFn = http.Get
-
-// isCacheHitFn as a function for mocking
-var isCacheHitFn = isCacheHit
-
-// downloadFileFn as a function for mocking
-var downloadFileFn = downloadFile
+// functions for mocking
+var (
+	mkdirAllFn     = os.MkdirAll
+	httpGetFn      = http.Get
+	createFn       = os.Create
+	copyFn         = io.Copy
+	getcacheFn     = os.UserCacheDir
+	isCacheHitFn   = isCacheHit
+	downloadFileFn = downloadFile
+)
 
 // downloadFile fetches the file from url and writes it to dest
 func downloadFile(ctx context.Context, url, dest string) (string, error) {
@@ -33,9 +32,9 @@ func downloadFile(ctx context.Context, url, dest string) (string, error) {
 		With("destination", dest).
 		Debug("downloading artifact")
 
-	downloadDir := filepath.Base(dest)
+	downloadDir := filepath.Dir(dest)
 	// create the directory where the target is downloaded.
-	if err := os.MkdirAll(downloadDir, 0777); err != nil {
+	if err := mkdirAllFn(downloadDir, 0777); err != nil {
 		return "", err
 	}
 
@@ -49,13 +48,13 @@ func downloadFile(ctx context.Context, url, dest string) (string, error) {
 		return "", fmt.Errorf("download error with status code %d", code)
 	}
 
-	outFile, err := os.Create(dest)
+	outFile, err := createFn(dest)
 	if err != nil {
 		return "", fmt.Errorf("failed to create file: %w", err)
 	}
 	defer outFile.Close()
 
-	_, err = io.Copy(outFile, resp.Body)
+	_, err = copyFn(outFile, resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to write to file: %w", err)
 	}

@@ -11,16 +11,33 @@ import (
 )
 
 func TestDownloadFile(t *testing.T) {
-	// Save the original httpGet to restore it later
+	// Save the original functions
+	originalmkdirAll := mkdirAllFn
 	originalHttpGet := httpGetFn
-	defer func() { httpGetFn = originalHttpGet }() // Restore after the test
+	originalCreateFn := createFn
+	originalCopyFn := copyFn
+
+	// Mock functions
+	mkdirAllFn = func(s string, m os.FileMode) error {
+		return nil
+	}
+	copyFn = func(w io.Writer, r io.Reader) (int64, error) {
+		return 0, nil
+	}
+
+	// Restore original functions when test finishes
+	defer func() { mkdirAllFn = originalmkdirAll }()
+	defer func() { httpGetFn = originalHttpGet }()
+	defer func() { createFn = originalCreateFn }()
+	defer func() { copyFn = originalCopyFn }()
 
 	tests := []struct {
-		name      string
-		url       string
-		dest      string
-		wantErr   bool
-		mockGetFn func(string) (*http.Response, error)
+		name          string
+		url           string
+		dest          string
+		fileCreateErr bool
+		wantErr       bool
+		mockGetFn     func(string) (*http.Response, error)
 	}{
 		{
 			name:    "successful_download",
@@ -48,10 +65,11 @@ func TestDownloadFile(t *testing.T) {
 			},
 		},
 		{
-			name:    "file_creation_error",
-			url:     "http://example.com/file.txt",
-			dest:    "/invalid/dir/testfile.txt",
-			wantErr: true,
+			name:          "file_creation_error",
+			url:           "http://example.com/file.txt",
+			dest:          "/invalid/dir/testfile.txt",
+			fileCreateErr: true,
+			wantErr:       true,
 			mockGetFn: func(url string) (*http.Response, error) {
 				body := io.NopCloser(strings.NewReader("mock file content"))
 				return &http.Response{
@@ -64,10 +82,18 @@ func TestDownloadFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Mock the httpGet function
+			// Mock the functions
 			httpGetFn = tt.mockGetFn
+			if tt.fileCreateErr {
+				createFn = func(s string) (*os.File, error) {
+					return nil, fmt.Errorf("error creating file")
+				}
+			} else {
+				createFn = func(s string) (*os.File, error) {
+					return &os.File{}, nil
+				}
+			}
 
-			// Execute the downloadFile function with the mocked httpGet
 			_, err := downloadFile(context.Background(), tt.url, tt.dest)
 			if gotErr := err != nil; gotErr != tt.wantErr {
 				t.Errorf("downloadFile() error = %v, wantErr %v", gotErr, tt.wantErr)
