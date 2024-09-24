@@ -15,7 +15,7 @@ import (
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
-	"github.com/drone/go-task/task/download"
+	download "github.com/drone/go-task/task/downloader"
 	"github.com/drone/go-task/task/drivers/cgi"
 )
 
