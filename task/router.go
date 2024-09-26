@@ -70,31 +70,11 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 	}
 
 	// handle each secret sub-task before handling
-	// the primary sub-task
-	for _, subtask := range req.Tasks {
-		subreq := new(Request)
-		subreq.Task = subtask
-		subreq.Tasks = req.Tasks
-		subreq.Secrets = req.Secrets
-
-		// handle the subtask and get the results.
-		res := h.handle(ctx, subreq)
-
-		// immediately exit if the system fails
-		// to execute the secret task.
-		if err := res.Error(); err != nil {
-			return res
-		}
-
-		// attempt to unmarshal the task response
-		// body into the secrets struct.
-		out := new(Secret)
-		if err := json.Unmarshal(res.Body(), &out); err != nil {
-			return Error(err)
-		}
-
-		// add the secret to request
-		req.Secrets[subtask.ID] = out.Value
+	// the primary task
+	var err error
+	req.Secrets, err = h.ResolveSecrets(ctx, req.Secrets, req.Tasks)
+	if err != nil {
+		return Error(err)
 	}
 
 	// add the structured logger to the context.
@@ -108,6 +88,62 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 
 	// handle the primary task
 	return h.handle(ctx, req)
+}
+
+func (h *Router) ResolveSecrets(ctx context.Context, secrets map[string]string, tasks []*Task) (map[string]string, error) {
+	// ensure secrets map is initialized
+	if secrets == nil {
+		secrets = map[string]string{}
+	}
+
+	// handle each secret sub-task
+	for _, subtask := range tasks {
+		subreq := new(Request)
+		subreq.Task = subtask
+		subreq.Secrets = secrets
+
+		// handle the subtask and get the results.
+		res := h.handle(ctx, subreq)
+
+		// immediately exit if the system fails
+		// to execute the secret task.
+		if err := res.Error(); err != nil {
+			return nil, err
+		}
+
+		// attempt to unmarshal the task response
+		// body into the secrets struct.
+		out := new(Secret)
+		if err := json.Unmarshal(res.Body(), &out); err != nil {
+			return nil, err
+		}
+
+		// add the secret to request
+		secrets[subtask.ID] = out.Value
+	}
+	return secrets, nil
+}
+
+func (h *Router) ResolveExpressions(ctx context.Context, secrets map[string]string, taskData []byte) ([]byte, error) {
+	if bytes.Contains(taskData, []byte("${{")) {
+		v := map[string]any{}
+
+		// unmarshal the task data into a map
+		err := json.Unmarshal(taskData, &v)
+		if err != nil {
+			return nil, err
+		}
+
+		// evaluate the expressions
+		evaler.Eval(v, secrets)
+
+		// encode the map back to json
+		taskData, err = json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return taskData, nil
 }
 
 // handle routes the task request to a handler.
@@ -128,24 +164,11 @@ func (h *Router) handle(ctx context.Context, req *Request) Response {
 		handler = h.notfound
 	}
 
-	// TODO(bradrydzewski) move expression eval to middleware?
-	if bytes.Contains(req.Task.Data, []byte("${{")) {
-		v := map[string]any{}
-
-		// unmarshal the task data into a map
-		err := json.Unmarshal(req.Task.Data, &v)
-		if err != nil {
-			return Error(err)
-		}
-
-		// evaluate the expressions
-		evaler.Eval(v, req.Secrets)
-
-		// encode the map back to json
-		req.Task.Data, err = json.Marshal(v)
-		if err != nil {
-			return Error(err)
-		}
+	// evaluate expressions
+	var err error
+	req.Task.Data, err = h.ResolveExpressions(ctx, req.Secrets, req.Task.Data)
+	if err != nil {
+		return Error(err)
 	}
 
 	// execute the handler stack with middleware
