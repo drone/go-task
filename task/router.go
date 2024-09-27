@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/drone/go-task/task/evaler"
+	"github.com/drone/go-task/task/expression"
 	"github.com/drone/go-task/task/logger"
 )
 
@@ -72,7 +72,7 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 	// handle each secret sub-task before handling
 	// the primary task
 	var err error
-	req.Secrets, err = h.ResolveSecrets(ctx, req.Secrets, req.Tasks)
+	req.Secrets, err = h.ResolveSecrets(ctx, req.Tasks)
 	if err != nil {
 		return Error(err)
 	}
@@ -90,11 +90,9 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 	return h.handle(ctx, req)
 }
 
-func (h *Router) ResolveSecrets(ctx context.Context, secrets map[string]string, tasks []*Task) (map[string]string, error) {
+func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) (map[string]string, error) {
 	// ensure secrets map is initialized
-	if secrets == nil {
-		secrets = map[string]string{}
-	}
+	secrets := map[string]string{}
 
 	// handle each secret sub-task
 	for _, subtask := range tasks {
@@ -126,22 +124,12 @@ func (h *Router) ResolveSecrets(ctx context.Context, secrets map[string]string, 
 
 func (h *Router) ResolveExpressions(ctx context.Context, secrets map[string]string, taskData []byte) ([]byte, error) {
 	if bytes.Contains(taskData, []byte("${{")) {
-		v := map[string]any{}
-
-		// unmarshal the task data into a map
-		err := json.Unmarshal(taskData, &v)
+		resolver := expression.New(secrets)
+		resolvedTaskData, err := resolver.Resolve(taskData)
 		if err != nil {
 			return nil, err
 		}
-
-		// evaluate the expressions
-		evaler.Eval(v, secrets)
-
-		// encode the map back to json
-		taskData, err = json.Marshal(v)
-		if err != nil {
-			return nil, err
-		}
+		return resolvedTaskData, nil
 	}
 	return taskData, nil
 }

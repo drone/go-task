@@ -214,7 +214,7 @@ func TestResolveSecrets(t *testing.T) {
 		return Respond(&Secret{Value: "mySecret"})
 	})
 
-	got, err := router.ResolveSecrets(noContext, make(map[string]string), []*Task{{ID: "secret_task_id", Type: "secret_task"}})
+	got, err := router.ResolveSecrets(noContext, []*Task{{ID: "secret_task_id", Type: "secret_task"}})
 	if err != nil {
 		t.Errorf("error when resolving secrets: %s", err)
 	}
