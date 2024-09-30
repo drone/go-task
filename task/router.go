@@ -91,7 +91,6 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 }
 
 func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) (map[string]string, error) {
-	// ensure secrets map is initialized
 	secrets := map[string]string{}
 
 	// handle each secret sub-task
