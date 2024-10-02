@@ -3,14 +3,15 @@ package expression
 import (
 	"encoding/json"
 
+	"github.com/drone/go-task/task/common"
 	"github.com/drone/go-task/task/expression/evaler"
 )
 
 type Resolver struct {
-	secrets map[string]string
+	secrets []*common.Secret
 }
 
-func New(secrets map[string]string) *Resolver {
+func New(secrets []*common.Secret) *Resolver {
 	return &Resolver{secrets: secrets}
 }
 

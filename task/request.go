@@ -4,7 +4,11 @@
 
 package task
 
-import "io"
+import (
+	"io"
+
+	"github.com/drone/go-task/task/common"
+)
 
 // Request defines a task request.
 type Request struct {
@@ -17,7 +21,7 @@ type Request struct {
 
 	// Secrets provides the names and values of secrets
 	// that are available to the task execution.
-	Secrets map[string]string `json:"-"`
+	Secrets []*common.Secret `json:"-"`
 
 	// Account provides the account identifier.
 	Account string `json:"account"`

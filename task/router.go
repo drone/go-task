@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"io"
 
+	"github.com/drone/go-task/task/common"
 	"github.com/drone/go-task/task/expression"
 	"github.com/drone/go-task/task/logger"
 )
@@ -64,11 +65,6 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 
 	log.Debug("route task")
 
-	// ensure all required variables are initialized.
-	if req.Secrets == nil {
-		req.Secrets = map[string]string{}
-	}
-
 	// handle each secret sub-task before handling
 	// the primary task
 	var err error
@@ -90,8 +86,8 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 	return h.handle(ctx, req)
 }
 
-func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) (map[string]string, error) {
-	secrets := map[string]string{}
+func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) ([]*common.Secret, error) {
+	secrets := []*common.Secret{}
 
 	// handle each secret sub-task
 	for _, subtask := range tasks {
@@ -110,18 +106,19 @@ func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) (map[string]
 
 		// attempt to unmarshal the task response
 		// body into the secrets struct.
-		out := new(Secret)
+		out := new(common.Secret)
 		if err := json.Unmarshal(res.Body(), &out); err != nil {
 			return nil, err
 		}
+		out.ID = subtask.ID
 
 		// add the secret to request
-		secrets[subtask.ID] = out.Value
+		secrets = append(secrets, out)
 	}
 	return secrets, nil
 }
 
-func (h *Router) ResolveExpressions(ctx context.Context, secrets map[string]string, taskData []byte) ([]byte, error) {
+func (h *Router) ResolveExpressions(ctx context.Context, secrets []*common.Secret, taskData []byte) ([]byte, error) {
 	if bytes.Contains(taskData, []byte("${{")) {
 		resolver := expression.New(secrets)
 		resolvedTaskData, err := resolver.Resolve(taskData)

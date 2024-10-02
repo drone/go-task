@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/drone/go-task/task/common"
 )
 
 var noContext = context.Background()
@@ -211,7 +213,7 @@ func TestMiddlewareErr(t *testing.T) {
 func TestResolveSecrets(t *testing.T) {
 	router := NewRouter()
 	router.RegisterFunc("secret_task", func(_ context.Context, req *Request) Response {
-		return Respond(&Secret{Value: "mySecret"})
+		return Respond(&common.Secret{Value: "mySecret"})
 	})
 
 	got, err := router.ResolveSecrets(noContext, []*Task{{ID: "secret_task_id", Type: "secret_task"}})
@@ -219,7 +221,7 @@ func TestResolveSecrets(t *testing.T) {
 		t.Errorf("error when resolving secrets: %s", err)
 	}
 
-	want := map[string]string{"secret_task_id": "mySecret"}
+	want := []*common.Secret{{ID: "secret_task_id", Value: "mySecret"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Want resolved secrets %v, got %v", want, got)
 	}
@@ -227,7 +229,7 @@ func TestResolveSecrets(t *testing.T) {
 
 func TestResolveExpressions(t *testing.T) {
 	router := NewRouter()
-	secrets := map[string]string{"secret_task_id": "mySecret"}
+	secrets := []*common.Secret{{ID: "secret_task_id", Value: "mySecret"}}
 	taskData, _ := json.Marshal(map[string]string{"taskKey": "this is my secret: ${{secrets.secret_task_id}}"})
 
 	resolvedTaskData, err := router.ResolveExpressions(noContext, secrets, taskData)
