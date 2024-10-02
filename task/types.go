@@ -79,11 +79,6 @@ type Executable struct {
 	Url  string `json:"url"`
 }
 
-// Secret stores the value of a secret variable.
-type Secret struct {
-	Value string `json:"value"`
-}
-
 // type State struct {
 // 	// ID provides a unique task identifier.
 // 	ID string `json:"id"`

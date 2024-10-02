@@ -10,7 +10,8 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/drone/go-task/task/evaler"
+	"github.com/drone/go-task/task/common"
+	"github.com/drone/go-task/task/expression"
 	"github.com/drone/go-task/task/logger"
 )
 
@@ -64,37 +65,12 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 
 	log.Debug("route task")
 
-	// ensure all required variables are initialized.
-	if req.Secrets == nil {
-		req.Secrets = map[string]string{}
-	}
-
 	// handle each secret sub-task before handling
-	// the primary sub-task
-	for _, subtask := range req.Tasks {
-		subreq := new(Request)
-		subreq.Task = subtask
-		subreq.Tasks = req.Tasks
-		subreq.Secrets = req.Secrets
-
-		// handle the subtask and get the results.
-		res := h.handle(ctx, subreq)
-
-		// immediately exit if the system fails
-		// to execute the secret task.
-		if err := res.Error(); err != nil {
-			return res
-		}
-
-		// attempt to unmarshal the task response
-		// body into the secrets struct.
-		out := new(Secret)
-		if err := json.Unmarshal(res.Body(), &out); err != nil {
-			return Error(err)
-		}
-
-		// add the secret to request
-		req.Secrets[subtask.ID] = out.Value
+	// the primary task
+	var err error
+	req.Secrets, err = h.ResolveSecrets(ctx, req.Tasks)
+	if err != nil {
+		return Error(err)
 	}
 
 	// add the structured logger to the context.
@@ -108,6 +84,50 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 
 	// handle the primary task
 	return h.handle(ctx, req)
+}
+
+func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) ([]*common.Secret, error) {
+	secrets := []*common.Secret{}
+
+	// handle each secret sub-task
+	for _, subtask := range tasks {
+		subreq := new(Request)
+		subreq.Task = subtask
+		subreq.Secrets = secrets
+
+		// handle the subtask and get the results.
+		res := h.handle(ctx, subreq)
+
+		// immediately exit if the system fails
+		// to execute the secret task.
+		if err := res.Error(); err != nil {
+			return nil, err
+		}
+
+		// attempt to unmarshal the task response
+		// body into the secrets struct.
+		out := new(common.Secret)
+		if err := json.Unmarshal(res.Body(), &out); err != nil {
+			return nil, err
+		}
+		out.ID = subtask.ID
+
+		// add the secret to request
+		secrets = append(secrets, out)
+	}
+	return secrets, nil
+}
+
+func (h *Router) ResolveExpressions(ctx context.Context, secrets []*common.Secret, taskData []byte) ([]byte, error) {
+	if bytes.Contains(taskData, []byte("${{")) {
+		resolver := expression.New(secrets)
+		resolvedTaskData, err := resolver.Resolve(taskData)
+		if err != nil {
+			return nil, err
+		}
+		return resolvedTaskData, nil
+	}
+	return taskData, nil
 }
 
 // handle routes the task request to a handler.
@@ -128,24 +148,11 @@ func (h *Router) handle(ctx context.Context, req *Request) Response {
 		handler = h.notfound
 	}
 
-	// TODO(bradrydzewski) move expression eval to middleware?
-	if bytes.Contains(req.Task.Data, []byte("${{")) {
-		v := map[string]any{}
-
-		// unmarshal the task data into a map
-		err := json.Unmarshal(req.Task.Data, &v)
-		if err != nil {
-			return Error(err)
-		}
-
-		// evaluate the expressions
-		evaler.Eval(v, req.Secrets)
-
-		// encode the map back to json
-		req.Task.Data, err = json.Marshal(v)
-		if err != nil {
-			return Error(err)
-		}
+	// evaluate expressions
+	var err error
+	req.Task.Data, err = h.ResolveExpressions(ctx, req.Secrets, req.Task.Data)
+	if err != nil {
+		return Error(err)
 	}
 
 	// execute the handler stack with middleware

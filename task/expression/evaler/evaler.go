@@ -11,10 +11,12 @@ import (
 	"encoding/base64"
 	"regexp"
 	"strings"
+
+	"github.com/drone/go-task/task/common"
 )
 
 // Eval evaluates expressions in the map structure.
-func Eval(data map[string]any, secrets map[string]string) {
+func Eval(data map[string]any, secrets []*common.Secret) {
 	var walk func(any) (bool, string)
 
 	// helper function to walk the map and inject
@@ -49,10 +51,12 @@ func Eval(data map[string]any, secrets map[string]string) {
 	walk(data)
 }
 
-func resolveSecrets(s string, secrets map[string]string) string {
+func resolveSecrets(s string, secrets []*common.Secret) string {
 	// HACK(bradrydzewski) find/replace secrets
 	// until we have proper expression support.
-	for key, value := range secrets {
+	for _, secret := range secrets {
+		key := secret.ID
+		value := secret.Value
 		a := "${{secrets." + key + "}}"
 		b := value
 		s = strings.ReplaceAll(s, a, b)
