@@ -27,6 +27,7 @@ type Config struct {
 	Endpoint         string                 `json:"endpoint"`
 	Headers          map[string]string      `json:"headers"`
 	Envs             []string               `json:"envs"`
+	Version          string                 `json:"version"`
 }
 
 // New returns the task execution driver.
@@ -40,43 +41,30 @@ type driver struct {
 
 // Handle handles the task execution request.
 func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
-	var (
-		log  = logger.FromContext(ctx)
-		conf = new(Config)
-	)
+	log := logger.FromContext(ctx)
 
+	conf := new(Config)
 	// decode the task configuration
 	err := json.Unmarshal(req.Task.Config, conf)
 	if err != nil {
 		return task.Error(err)
 	}
 
-	path, err := d.downloader.DownloadRepo(ctx, conf.Repository)
+	path, err := d.downloadArtifact(ctx, req.Task.Type, conf)
 	if err != nil {
 		log.With("error", err).Error("artifact download failed")
 		return task.Error(err)
 	}
 
-	if conf.Method == "" {
-		conf.Method = "POST"
+	setDefaultConfigValues(conf)
+
+	binPath, err := d.getBinaryPath(ctx, path, conf)
+	if err != nil {
+		log.With("error", err).Error("task build failed")
+		return task.Error(err)
 	}
 
-	if conf.Endpoint == "" {
-		conf.Endpoint = "/"
-	}
-
-	var binpath string
-	if conf.ExecutableConfig != nil {
-		// if an executable is downloaded directly via url, no need to use `builder`
-		binpath = path
-	} else {
-		builder := builder.New(filepath.Join(path, taskYmlPath))
-		binpath, err = builder.Build(ctx)
-		if err != nil {
-			log.With("error", err).Error("task build failed")
-		}
-	}
-	execer := newExecer(binpath, conf)
+	execer := newExecer(binPath, conf)
 	resp, err := execer.Exec(ctx, req.Task.Data)
 	if err != nil {
 		log.With("error", err).Error("could not execute cgi task")
@@ -84,4 +72,29 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 	}
 
 	return task.Respond(resp)
+}
+
+func (d *driver) downloadArtifact(ctx context.Context, taskType string, conf *Config) (string, error) {
+	if conf.ExecutableConfig != nil {
+		return d.downloader.DownloadExecutable(ctx, taskType, conf.Version, conf.ExecutableConfig)
+	}
+	return d.downloader.DownloadRepo(ctx, conf.Repository)
+}
+
+func setDefaultConfigValues(conf *Config) {
+	if conf.Method == "" {
+		conf.Method = "POST"
+	}
+	if conf.Endpoint == "" {
+		conf.Endpoint = "/"
+	}
+}
+
+func (d *driver) getBinaryPath(ctx context.Context, path string, conf *Config) (string, error) {
+	if conf.ExecutableConfig != nil {
+		return path, nil
+	}
+
+	builder := builder.New(filepath.Join(path, taskYmlPath))
+	return builder.Build(ctx)
 }
