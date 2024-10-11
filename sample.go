@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/drone/go-task/task"
+	"github.com/drone/go-task/task/common"
 	"github.com/drone/go-task/task/masker"
 )
 
@@ -130,7 +131,7 @@ func fileHandler(ctx context.Context, req *task.Request) task.Response {
 
 	// write the secret to the response.
 	return task.Respond(
-		&task.Secret{
+		&common.Secret{
 			Value: string(contents),
 		},
 	)

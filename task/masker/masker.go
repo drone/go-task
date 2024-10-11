@@ -7,6 +7,8 @@ package masker
 import (
 	"io"
 	"strings"
+
+	"github.com/drone/go-task/task/common"
 )
 
 // replacer is an io.Writer that finds and masks
@@ -49,9 +51,9 @@ func (r *replacer) Write(p []byte) (n int, err error) {
 }
 
 // Slice converts a key value pair of secrets to a slice.
-func Slice(in map[string]string) (out []string) {
-	for _, v := range in {
-		out = append(out, v)
+func Slice(in []*common.Secret) (out []string) {
+	for _, secret := range in {
+		out = append(out, secret.Value)
 	}
 	return out
 }

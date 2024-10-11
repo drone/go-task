@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/drone/go-task/task/common"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -26,9 +27,7 @@ func TestEval(t *testing.T) {
                 "emptyBase64Encoded": "${{getAsBase64()}}"
 	}`)
 
-	var data = map[string]string{
-		"c94f469b-d84e-4489-9f10-b6b38a7e6023": "9f105c56f29e4489",
-	}
+	var data = []*common.Secret{{ID: "c94f469b-d84e-4489-9f10-b6b38a7e6023", Value: "9f105c56f29e4489"}}
 
 	input := map[string]any{}
 	json.Unmarshal(jsondata, &input)
