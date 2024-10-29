@@ -8,13 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	globallogger "github.com/harness/runner/logger/logger"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
 
 	"github.com/drone/go-task/task"
-	"github.com/drone/go-task/task/logger"
 )
 
 // removeAllFn as a function for mocking
@@ -85,7 +85,7 @@ func (e *executableDownloader) getExecutableUrl(config *task.ExecutableConfig, o
 
 // logExecutableDownload writes details about the Executable struct used to download a task's executable file
 func (e *executableDownloader) logExecutableDownload(ctx context.Context, exec *task.ExecutableConfig, operatingSystem, architecture string) {
-	log := logger.FromContext(ctx)
+	log := globallogger.FromContext(ctx)
 	filename := "executable_downloads.log"
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {

@@ -3,12 +3,11 @@ package builder
 import (
 	"context"
 	"fmt"
+	globallogger "github.com/harness/runner/logger/logger"
 	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"runtime"
-
-	"github.com/drone/go-task/task/logger"
 )
 
 type Builder struct {
@@ -23,7 +22,7 @@ func New(taskYmlPath string) *Builder {
 
 // Build parses the task.yml file and generates the executable binary for a task
 func (b *Builder) Build(ctx context.Context) (string, error) {
-	log := logger.FromContext(ctx)
+	log := globallogger.FromContext(ctx)
 	out, err := ParseFile(b.TaskYmlPath)
 	if err != nil {
 		return "", err
@@ -75,7 +74,7 @@ func (b *Builder) installDeps(ctx context.Context, deps Deps) error {
 }
 
 func (b *Builder) installAptDeps(ctx context.Context, deps []AptDep) error {
-	log := logger.FromContext(ctx)
+	log := globallogger.FromContext(ctx)
 	var err error
 	if len(deps) > 0 {
 		log.Info("apt-get update")
@@ -114,7 +113,7 @@ func (b *Builder) buildGoModule(
 	module string,
 	binName string, // name of the target binary
 ) error {
-	log := logger.FromContext(ctx)
+	log := globallogger.FromContext(ctx)
 	log.Info("go build", slog.String("module", module))
 
 	// build the code
@@ -126,7 +125,7 @@ func (b *Builder) buildGoModule(
 }
 
 func (b *Builder) installBrewDeps(ctx context.Context, deps []BrewDep) error {
-	log := logger.FromContext(ctx)
+	log := globallogger.FromContext(ctx)
 	for _, item := range deps {
 		log.Info("brew install", slog.String("package", item.Name))
 

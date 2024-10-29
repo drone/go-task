@@ -6,27 +6,26 @@ package logger
 
 import (
 	"context"
-	"log/slog"
+	"github.com/sirupsen/logrus"
 )
 
 type key struct{} // logger key
 
-// WithContext returns a new context with the provided logger.
-func WithContext(ctx context.Context, logger *slog.Logger) context.Context {
+// WithContext returns a new context with the provided logger
+func WithContext(ctx context.Context, logger *logrus.Entry) context.Context {
 	return context.WithValue(ctx, key{}, logger)
 }
 
-// FromContext retrieves the current logger from the context.
-func FromContext(ctx context.Context) *slog.Logger {
-	// if nil, return the defualt logger
+// FromContext retrieves the current logger from the context
+func FromContext(ctx context.Context) *logrus.Entry {
 	if ctx == nil {
-		return slog.Default()
+		return logrus.NewEntry(logrus.StandardLogger())
 	}
+
 	v := ctx.Value(key{})
-	// return the valid logger if returned
-	if logger, ok := v.(*slog.Logger); ok {
+	if logger, ok := v.(*logrus.Entry); ok {
 		return logger
 	}
-	// else return the default logger
-	return slog.Default()
+
+	return logrus.NewEntry(logrus.StandardLogger())
 }

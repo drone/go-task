@@ -7,12 +7,12 @@ package cgi
 import (
 	"context"
 	"encoding/json"
+	globallogger "github.com/harness/runner/logger/logger"
 	"path/filepath"
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/builder"
 	"github.com/drone/go-task/task/downloader"
-	"github.com/drone/go-task/task/logger"
 )
 
 var (
@@ -41,7 +41,7 @@ type driver struct {
 
 // Handle handles the task execution request.
 func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
-	log := logger.FromContext(ctx)
+	log := globallogger.FromContext(ctx)
 
 	conf := new(Config)
 	// decode the task configuration
@@ -52,7 +52,7 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 
 	path, err := d.downloadArtifact(ctx, req.Task.Type, conf)
 	if err != nil {
-		log.With("error", err).Error("artifact download failed")
+		log.WithError(err).Error("artifact download failed")
 		return task.Error(err)
 	}
 
@@ -60,14 +60,14 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 
 	binPath, err := d.getBinaryPath(ctx, path, conf)
 	if err != nil {
-		log.With("error", err).Error("task build failed")
+		log.WithError(err).Error("task build failed")
 		return task.Error(err)
 	}
 
 	execer := newExecer(binPath, conf)
 	resp, err := execer.Exec(ctx, req.Task.Data)
 	if err != nil {
-		log.With("error", err).Error("could not execute cgi task")
+		log.WithError(err).Error("could not execute cgi task")
 		return task.Error(err)
 	}
 

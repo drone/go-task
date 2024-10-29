@@ -3,6 +3,7 @@ package downloader
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"net/url"
@@ -10,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/drone/go-task/task/logger"
+	globallogger "github.com/harness/runner/logger/logger"
 )
 
 // functions for mocking
@@ -26,11 +27,13 @@ var (
 
 // downloadFile fetches the file from url and writes it to dest
 func downloadFile(ctx context.Context, url, dest string) (string, error) {
-	log := logger.FromContext(ctx)
 
-	log.With("source", url).
-		With("destination", dest).
-		Debug("downloading artifact")
+	log := globallogger.FromContext(ctx).
+		WithFields(logrus.Fields{
+			"source":      url,
+			"destination": dest,
+		})
+	log.Debug("downloading artifact")
 
 	downloadDir := filepath.Dir(dest)
 	// create the directory where the target is downloaded.
@@ -59,9 +62,7 @@ func downloadFile(ctx context.Context, url, dest string) (string, error) {
 		return "", fmt.Errorf("failed to write to file: %w", err)
 	}
 
-	log.With("source", url).
-		With("destination", dest).
-		Debug("downloaded artifact")
+	log.Debug("downloaded artifact")
 
 	return dest, nil
 }
@@ -74,16 +75,17 @@ func getDownloadPath(url, dest string) string {
 
 // isCacheHit checks if the `dest` folder already exists
 func isCacheHit(ctx context.Context, dest string) bool {
-	log := logger.FromContext(ctx)
+	log := globallogger.FromContext(ctx).
+		WithFields(logrus.Fields{
+			"target": dest,
+		})
 
 	if _, err := os.Stat(dest); err == nil {
-		log.With("target", dest).
-			Debug("cache hit")
+		log.Debug("cache hit")
 		return true
 	}
 
-	log.With("target", dest).
-		Debug("cache miss")
+	log.Debug("cache miss")
 	return false
 }
 

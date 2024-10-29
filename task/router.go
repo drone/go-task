@@ -8,11 +8,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/sirupsen/logrus"
+
 	"io"
 
 	"github.com/drone/go-task/task/common"
 	"github.com/drone/go-task/task/expression"
 	"github.com/drone/go-task/task/logger"
+	globallogger "github.com/harness/runner/logger/logger"
 )
 
 // Router routes task execution requests to the
@@ -58,11 +61,12 @@ func (h *Router) NotFoundFunc(handler HandlerFunc) {
 
 // Handle routes the task request to a handler.
 func (h *Router) Handle(ctx context.Context, req *Request) Response {
-	log := logger.FromContext(ctx).
-		With("task.id", req.Task.ID).
-		With("task.type", req.Task.Type).
-		With("task.driver", req.Task.Driver)
-
+	log := globallogger.FromContext(ctx).
+		WithFields(logrus.Fields{
+			"task.id":     req.Task.ID,
+			"task.type":   req.Task.Type,
+			"task.driver": req.Task.Driver,
+		})
 	log.Debug("route task")
 
 	// handle each secret sub-task before handling

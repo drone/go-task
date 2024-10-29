@@ -10,6 +10,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	globallogger "github.com/harness/runner/logger/logger"
+	"github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,7 +19,6 @@ import (
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
-	"github.com/drone/go-task/task/logger"
 	"github.com/mholt/archiver"
 )
 
@@ -49,18 +50,21 @@ func (r *repoDownloader) download(ctx context.Context, dir string, repo *task.Re
 }
 
 func (r *repoDownloader) clone(ctx context.Context, repo *task.Repository, dest string) error {
-	log := logger.FromContext(ctx)
 
 	// extract the clone url, ref and sha
 	url := repo.Clone
 	ref := repo.Ref
 	sha := repo.Sha
 
-	log.With("source", url).
-		With("revision", ref).
-		With("sha", sha).
-		With("target", dest).
-		Debug("clone artifact")
+	log := globallogger.FromContext(ctx).
+		WithFields(logrus.Fields{
+			"source":   url,
+			"revision": ref,
+			"sha":      sha,
+			"target":   dest,
+		})
+
+	log.Debug("clone artifact")
 
 	// clone the repository
 	err := r.cloner.Clone(ctx, cloner.Params{
@@ -77,7 +81,6 @@ func (r *repoDownloader) clone(ctx context.Context, repo *task.Repository, dest 
 }
 
 func (r *repoDownloader) downloadRepo(ctx context.Context, repo *task.Repository, destDir string) error {
-	log := logger.FromContext(ctx)
 
 	dest := getDownloadPath(repo.Download, destDir)
 	downloadPath, err := downloadFile(ctx, repo.Download, dest)
@@ -93,9 +96,13 @@ func (r *repoDownloader) downloadRepo(ctx context.Context, repo *task.Repository
 		return err
 	}
 
-	log.With("source", repo.Download).
-		With("destination", dest).
-		Debug("extracted artifact")
+	log := globallogger.FromContext(ctx).
+		WithFields(logrus.Fields{
+			"source":      repo.Download,
+			"destination": dest,
+		})
+
+	log.Debug("extracted artifact")
 
 	// delete the archive file after unpacking
 	os.Remove(downloadPath)

@@ -7,13 +7,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	globallogger "github.com/harness/runner/logger/logger"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"net/http/cgi"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-
-	"github.com/drone/go-task/task/logger"
 )
 
 type Execer struct {
@@ -30,7 +30,7 @@ func newExecer(binpath string, cgiConfig *Config) *Execer {
 
 // Exec executes the task given the binary filepath and the configuration
 func (e *Execer) Exec(ctx context.Context, in []byte) ([]byte, error) {
-	log := logger.FromContext(ctx)
+	log := globallogger.FromContext(ctx)
 	conf := e.CGIConfig
 
 	// run the task using cgi
@@ -57,11 +57,10 @@ func (e *Execer) Exec(ctx context.Context, in []byte) ([]byte, error) {
 	// create ethe cgi response
 	rw := httptest.NewRecorder()
 
-	log.With("cgi.dir", filepath.Dir(e.Binpath)).
-		With("cgi.path", e.Binpath).
-		With("cgi.method", conf.Method).
-		With("cgi.url", conf.Endpoint).
-		Debug("invoke cgi task")
+	log.WithFields(logrus.Fields{"cgi.dir": filepath.Dir(e.Binpath),
+		"cgi.path":   e.Binpath,
+		"cgi.method": conf.Method,
+		"cgi.url":    conf.Endpoint}).Debug("invoke cgi task")
 
 	// execute the request
 	handler.ServeHTTP(rw, r)
