@@ -31,7 +31,7 @@ func newExecutableDownloader() *executableDownloader {
 	return &executableDownloader{}
 }
 
-func (e *executableDownloader) download(ctx context.Context, dir string, taskType string, version string, exec *task.ExecutableConfig) (string, error) {
+func (e *executableDownloader) download(ctx context.Context, dir string, taskType string, exec *task.ExecutableConfig) (string, error) {
 	if exec == nil {
 		return "", errors.New("no executable urls provided to download")
 	}
@@ -42,7 +42,7 @@ func (e *executableDownloader) download(ctx context.Context, dir string, taskTyp
 		return "", fmt.Errorf("os [%s] and architecture [%s] are not specified in executable configuration", operatingSystem, architecture)
 	}
 
-	destDir := filepath.Join(dir, taskType, version)
+	destDir := filepath.Join(dir, taskType, getHash(url))
 	dest := getDownloadPath(url, destDir)
 
 	if cacheHit := isCacheHitFn(ctx, destDir); cacheHit {

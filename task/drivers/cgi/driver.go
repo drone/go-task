@@ -27,7 +27,6 @@ type Config struct {
 	Endpoint         string                 `json:"endpoint"`
 	Headers          map[string]string      `json:"headers"`
 	Envs             []string               `json:"envs"`
-	Version          string                 `json:"version"`
 }
 
 // New returns the task execution driver.
@@ -76,7 +75,7 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 
 func (d *driver) downloadArtifact(ctx context.Context, taskType string, conf *Config) (string, error) {
 	if conf.ExecutableConfig != nil {
-		return d.downloader.DownloadExecutable(ctx, taskType, conf.Version, conf.ExecutableConfig)
+		return d.downloader.DownloadExecutable(ctx, taskType, conf.ExecutableConfig)
 	}
 	return d.downloader.DownloadRepo(ctx, conf.Repository)
 }

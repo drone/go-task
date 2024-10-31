@@ -48,7 +48,6 @@ func TestDownloadExecutable(t *testing.T) {
 			name:     "successful_download",
 			dir:      "/tmp",
 			taskType: "binary",
-			version:  "v1.0.0",
 			exec: &task.ExecutableConfig{
 				Executables: []task.Executable{
 					{Os: runtime.GOOS, Arch: runtime.GOARCH, Url: "valid_url"},
@@ -61,7 +60,6 @@ func TestDownloadExecutable(t *testing.T) {
 			name:     "cache_hit",
 			dir:      "/tmp",
 			taskType: "binary",
-			version:  "v1.0.0",
 			exec: &task.ExecutableConfig{
 				Executables: []task.Executable{
 					{Os: runtime.GOOS, Arch: runtime.GOARCH, Url: "valid_url"},
@@ -74,7 +72,6 @@ func TestDownloadExecutable(t *testing.T) {
 			name:     "download_error",
 			dir:      "/tmp",
 			taskType: "binary",
-			version:  "v1.0.0",
 			exec: &task.ExecutableConfig{
 				Executables: []task.Executable{
 					{Os: runtime.GOOS, Arch: runtime.GOARCH, Url: "invalid_url"},
@@ -88,7 +85,6 @@ func TestDownloadExecutable(t *testing.T) {
 			name:     "chmod_error",
 			dir:      "/tmp",
 			taskType: "binary",
-			version:  "v1.0.0",
 			exec: &task.ExecutableConfig{
 				Executables: []task.Executable{
 					{Os: runtime.GOOS, Arch: runtime.GOARCH, Url: "valid_url"},
@@ -120,7 +116,7 @@ func TestDownloadExecutable(t *testing.T) {
 				return dest, nil
 			}
 
-			_, err := downloader.download(context.Background(), tt.dir, tt.taskType, tt.version, tt.exec)
+			_, err := downloader.download(context.Background(), tt.dir, tt.taskType, tt.exec)
 
 			if tt.wantErr {
 				assert.Error(t, err)

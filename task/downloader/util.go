@@ -2,6 +2,8 @@ package downloader
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -121,4 +123,10 @@ func SplitRef(s string) (string, string) {
 		u.RawFragment = ""
 		return u.String(), ref
 	}
+}
+
+func getHash(s string) string {
+	hash := sha256.New()
+	hash.Write([]byte(s))
+	return hex.EncodeToString(hash.Sum(nil))
 }
