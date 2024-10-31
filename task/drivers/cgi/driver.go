@@ -7,7 +7,7 @@ package cgi
 import (
 	"context"
 	"encoding/json"
-	globallogger "github.com/harness/runner/logger/logger"
+	"github.com/drone/go-task/task/logger"
 	"path/filepath"
 
 	"github.com/drone/go-task/task"
@@ -41,7 +41,7 @@ type driver struct {
 
 // Handle handles the task execution request.
 func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
-	log := globallogger.FromContext(ctx)
+	log := logger.FromContext(ctx)
 
 	conf := new(Config)
 	// decode the task configuration

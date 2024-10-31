@@ -10,7 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	globallogger "github.com/harness/runner/logger/logger"
+	"github.com/drone/go-task/task/logger"
 	"github.com/sirupsen/logrus"
 	"io"
 	"os"
@@ -42,7 +42,6 @@ func (r *repoDownloader) download(ctx context.Context, dir string, repo *task.Re
 		// exit if the destination already exists
 		return dest, nil
 	}
-
 	if repo.Download != "" {
 		return dest, r.downloadRepo(ctx, repo, dest)
 	}
@@ -56,7 +55,7 @@ func (r *repoDownloader) clone(ctx context.Context, repo *task.Repository, dest 
 	ref := repo.Ref
 	sha := repo.Sha
 
-	log := globallogger.FromContext(ctx).
+	log := logger.FromContext(ctx).
 		WithFields(logrus.Fields{
 			"source":   url,
 			"revision": ref,
@@ -96,7 +95,7 @@ func (r *repoDownloader) downloadRepo(ctx context.Context, repo *task.Repository
 		return err
 	}
 
-	log := globallogger.FromContext(ctx).
+	log := logger.FromContext(ctx).
 		WithFields(logrus.Fields{
 			"source":      repo.Download,
 			"destination": dest,

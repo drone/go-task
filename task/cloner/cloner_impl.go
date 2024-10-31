@@ -6,6 +6,7 @@ package cloner
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os/exec"
 )
@@ -21,29 +22,33 @@ type cloner struct {
 func Default() Cloner {
 	return new(cloner)
 }
-
 func (c *cloner) Clone(ctx context.Context, params Params) error {
 	var cmd *exec.Cmd
 
+	// Build the git clone command with verbosity
 	if params.Ref != "" {
-		cmd = exec.CommandContext(ctx, "git", "clone", "--depth=1", "--branch="+params.Ref, params.Repo, params.Dir)
+		cmd = exec.CommandContext(ctx, "git", "clone", "--depth=1", "--branch="+params.Ref, "-v", params.Repo, params.Dir)
 	} else {
-		cmd = exec.CommandContext(ctx, "git", "clone", "--depth=1", params.Repo, params.Dir)
+		cmd = exec.CommandContext(ctx, "git", "clone", "--depth=1", "-v", params.Repo, params.Dir)
 	}
 
 	cmd.Stdout = c.stdout
 	cmd.Stderr = c.stderr
-	if err := cmd.Run(); err != nil {
-		return err
+
+	// Run the clone command and capture output in case of error
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to clone repo: %v, output: %s", err, output)
 	}
 
-	// check out the specific SHA if provided
+	// Check out the specific SHA if provided, also with verbose output
 	if params.Sha != "" {
-		cmd = exec.CommandContext(ctx, "git", "-C", params.Dir, "checkout", params.Sha)
+		cmd = exec.CommandContext(ctx, "git", "-C", params.Dir, "checkout", params.Sha, "-v")
 		cmd.Stdout = c.stdout
 		cmd.Stderr = c.stderr
-		if err := cmd.Run(); err != nil {
-			return err
+
+		// Run the checkout command and capture output in case of error
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to checkout SHA: %v, output: %s", err, output)
 		}
 	}
 

@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	globallogger "github.com/harness/runner/logger/logger"
+	"github.com/drone/go-task/task/logger"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"net/http/cgi"
@@ -30,7 +30,7 @@ func newExecer(binpath string, cgiConfig *Config) *Execer {
 
 // Exec executes the task given the binary filepath and the configuration
 func (e *Execer) Exec(ctx context.Context, in []byte) ([]byte, error) {
-	log := globallogger.FromContext(ctx)
+	log := logger.FromContext(ctx)
 	conf := e.CGIConfig
 
 	// run the task using cgi

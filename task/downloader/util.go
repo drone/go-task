@@ -3,6 +3,7 @@ package downloader
 import (
 	"context"
 	"fmt"
+	"github.com/drone/go-task/task/logger"
 	"github.com/sirupsen/logrus"
 	"io"
 	"net/http"
@@ -10,8 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	globallogger "github.com/harness/runner/logger/logger"
 )
 
 // functions for mocking
@@ -28,7 +27,7 @@ var (
 // downloadFile fetches the file from url and writes it to dest
 func downloadFile(ctx context.Context, url, dest string) (string, error) {
 
-	log := globallogger.FromContext(ctx).
+	log := logger.FromContext(ctx).
 		WithFields(logrus.Fields{
 			"source":      url,
 			"destination": dest,
@@ -75,7 +74,7 @@ func getDownloadPath(url, dest string) string {
 
 // isCacheHit checks if the `dest` folder already exists
 func isCacheHit(ctx context.Context, dest string) bool {
-	log := globallogger.FromContext(ctx).
+	log := logger.FromContext(ctx).
 		WithFields(logrus.Fields{
 			"target": dest,
 		})
