@@ -8,11 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/drone/go-task/task/logger"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/drone/go-task/task/logger"
 
 	"github.com/drone/go-task/task"
 )

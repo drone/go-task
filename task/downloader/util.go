@@ -3,14 +3,15 @@ package downloader
 import (
 	"context"
 	"fmt"
-	"github.com/drone/go-task/task/logger"
-	"github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/drone/go-task/task/logger"
+	"github.com/sirupsen/logrus"
 )
 
 // functions for mocking

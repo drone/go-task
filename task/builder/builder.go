@@ -3,11 +3,12 @@ package builder
 import (
 	"context"
 	"fmt"
-	"github.com/drone/go-task/task/logger"
 	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/drone/go-task/task/logger"
 )
 
 type Builder struct {

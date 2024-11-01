@@ -6,6 +6,7 @@ package logger
 
 import (
 	"context"
+
 	"github.com/sirupsen/logrus"
 )
 

@@ -7,8 +7,9 @@ package cgi
 import (
 	"context"
 	"encoding/json"
-	"github.com/drone/go-task/task/logger"
 	"path/filepath"
+
+	"github.com/drone/go-task/task/logger"
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/builder"

@@ -10,12 +10,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/drone/go-task/task/logger"
-	"github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/drone/go-task/task/logger"
+	"github.com/sirupsen/logrus"
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
