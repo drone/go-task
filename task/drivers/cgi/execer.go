@@ -7,14 +7,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/drone/go-task/task/logger"
-	"github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"net/http/cgi"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+
+	"github.com/drone/go-task/task/logger"
+	"github.com/sirupsen/logrus"
 )
 
 type Execer struct {
