@@ -9,8 +9,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/sirupsen/logrus"
-
 	"io"
 
 	"github.com/drone/go-task/task/common"
@@ -62,7 +60,7 @@ func (h *Router) NotFoundFunc(handler HandlerFunc) {
 // Handle routes the task request to a handler.
 func (h *Router) Handle(ctx context.Context, req *Request) Response {
 	log := logger.FromContext(ctx).
-		WithFields(logrus.Fields{
+		WithFields(map[string]interface{}{
 			"task.id":     req.Task.ID,
 			"task.type":   req.Task.Type,
 			"task.driver": req.Task.Driver,

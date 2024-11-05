@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/drone/go-task/task/logger"
-	"github.com/sirupsen/logrus"
 )
 
 // functions for mocking
@@ -29,7 +28,7 @@ var (
 func downloadFile(ctx context.Context, url, dest string) (string, error) {
 
 	log := logger.FromContext(ctx).
-		WithFields(logrus.Fields{
+		WithFields(map[string]interface{}{
 			"source":      url,
 			"destination": dest,
 		})
@@ -76,7 +75,7 @@ func getDownloadPath(url, dest string) string {
 // isCacheHit checks if the `dest` folder already exists
 func isCacheHit(ctx context.Context, dest string) bool {
 	log := logger.FromContext(ctx).
-		WithFields(logrus.Fields{
+		WithFields(map[string]interface{}{
 			"target": dest,
 		})
 

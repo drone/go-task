@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 
 	"github.com/drone/go-task/task/logger"
-	"github.com/sirupsen/logrus"
 )
 
 type Execer struct {
@@ -33,7 +32,7 @@ func newExecer(binpath string, cgiConfig *Config) *Execer {
 // Exec executes the task given the binary filepath and the configuration
 func (e *Execer) Exec(ctx context.Context, in []byte) ([]byte, error) {
 	conf := e.CGIConfig
-	log := logger.FromContext(ctx).WithFields(logrus.Fields{
+	log := logger.FromContext(ctx).WithFields(map[string]interface{}{
 		"cgi.dir":    filepath.Dir(e.Binpath),
 		"cgi.path":   e.Binpath,
 		"cgi.method": conf.Method,

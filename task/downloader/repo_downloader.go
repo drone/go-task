@@ -15,11 +15,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/drone/go-task/task/logger"
-	"github.com/sirupsen/logrus"
-
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
+	"github.com/drone/go-task/task/logger"
 	"github.com/mholt/archiver"
 )
 
@@ -57,7 +55,7 @@ func (r *repoDownloader) clone(ctx context.Context, repo *task.Repository, dest 
 	sha := repo.Sha
 
 	log := logger.FromContext(ctx).
-		WithFields(logrus.Fields{
+		WithFields(map[string]interface{}{
 			"source":   url,
 			"revision": ref,
 			"sha":      sha,
@@ -97,7 +95,7 @@ func (r *repoDownloader) downloadRepo(ctx context.Context, repo *task.Repository
 	}
 
 	log := logger.FromContext(ctx).
-		WithFields(logrus.Fields{
+		WithFields(map[string]interface{}{
 			"source":      repo.Download,
 			"destination": dest,
 		})
