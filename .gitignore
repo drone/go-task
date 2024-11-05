@@ -3,3 +3,15 @@ _backup
 go-task
 test.sh
 test.jwt
+samples/dt.json
+samples/invalidtest-old.json
+samples/invalidtest.json
+samples/test-aws.json
+samples/test-new-format.json
+samples/test-new.json
+samples/test-old.json
+samples/test-without-aws_.json
+samples/test.json
+task/router.go.txt
+task/drivers/cgi/execer.go.txt
+task/drivers/cgi/execer.go.logger.txt
