@@ -6,8 +6,6 @@ package downloader
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -172,11 +170,5 @@ func (r *repoDownloader) getDownloadDir(dir string, repo *task.Repository) strin
 // whether it should be re-cloned.
 func (r *repoDownloader) getHashOfRepo(repo *task.Repository) string {
 	data := fmt.Sprintf("%s|%s|%s|%s", repo.Clone, repo.Ref, repo.Sha, repo.Download)
-	return r.getHash(data)
-}
-
-func (r *repoDownloader) getHash(s string) string {
-	hash := sha256.New()
-	hash.Write([]byte(s))
-	return hex.EncodeToString(hash.Sum(nil))
+	return getHash(data)
 }
