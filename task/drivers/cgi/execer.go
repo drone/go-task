@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/cgi"
 	"net/http/httptest"
@@ -30,48 +31,63 @@ func newExecer(binpath string, cgiConfig *Config) *Execer {
 
 // Exec executes the task given the binary filepath and the configuration
 func (e *Execer) Exec(ctx context.Context, in []byte) ([]byte, error) {
-	log := logger.FromContext(ctx)
 	conf := e.CGIConfig
+	log := logger.FromContext(ctx).WithFields(map[string]interface{}{
+		"cgi.dir":    filepath.Dir(e.Binpath),
+		"cgi.path":   e.Binpath,
+		"cgi.method": conf.Method,
+		"cgi.url":    conf.Endpoint,
+	})
 
-	// run the task using cgi
+	// stderrPipe is the reading end of the pipe that will capture anything written to stderr
+	// stderrWriter is the writing end of that pipe
+	// we pass stderrWriter to the CGI handler and read the output from stderrPipe
+	stderrPipe, stderrWriter, err := os.Pipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+	defer stderrPipe.Close()
+
 	handler := cgi.Handler{
 		Path: e.Binpath,
 		Dir:  filepath.Dir(e.Binpath),
-		Env:  append(conf.Envs, os.Environ()...), // is this needed?
-
-		Logger: nil, // TODO support optional logger
-		Stderr: nil, // TODO support optional stderr
+		Env:  append(conf.Envs, os.Environ()...),
+		// the CGI handler reserves the stdout for the HTTP response (technically the application response) and all log messages are supposed to be written to stderr
+		// by default frameworks like logrus, slog writes to stderr
+		Stderr: stderrWriter,
 	}
 
-	r, err := http.NewRequestWithContext(ctx, conf.Method, conf.Endpoint,
-		bytes.NewReader(in),
-	)
+	// prepare the HTTP request for the handler
+	req, err := http.NewRequestWithContext(ctx, conf.Method, conf.Endpoint, bytes.NewReader(in))
 	if err != nil {
-		return nil, fmt.Errorf("cannot invoke task: %s", err)
+		return nil, fmt.Errorf("cannot create CGI request: %w", err)
 	}
-
 	for key, value := range conf.Headers {
-		r.Header.Set(key, value)
+		req.Header.Set(key, value)
 	}
 
-	// create ethe cgi response
-	rw := httptest.NewRecorder()
+	// record the CGI handler’s response
+	responseRecorder := httptest.NewRecorder()
+	log.Debug("Invoking CGI task")
 
-	log.With("cgi.dir", filepath.Dir(e.Binpath)).
-		With("cgi.path", e.Binpath).
-		With("cgi.method", conf.Method).
-		With("cgi.url", conf.Endpoint).
-		Debug("invoke cgi task")
+	// Execute the request
+	handler.ServeHTTP(responseRecorder, req)
+	stderrWriter.Close()
 
-	// execute the request
-	handler.ServeHTTP(rw, r)
+	// capture stderr output
+	var stderrBuf bytes.Buffer
+	_, err = io.Copy(&stderrBuf, stderrPipe)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CGI output: %w", err)
+	}
 
+	log.Infof("Captured CGI output: %s", stderrBuf.String())
 	// check the error code and write the error
 	// to the context, if applicable.
 	// TODO should we unmarshal the response body to an error type?
-	if code := rw.Code; code > 299 {
-		return nil, fmt.Errorf("received error code %d", code)
+	if responseRecorder.Code > 299 {
+		return nil, fmt.Errorf("received error code %d", responseRecorder.Code)
 	}
 
-	return rw.Body.Bytes(), nil
+	return responseRecorder.Body.Bytes(), nil
 }

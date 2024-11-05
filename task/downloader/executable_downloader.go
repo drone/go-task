@@ -13,8 +13,9 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/logger"
+
+	"github.com/drone/go-task/task"
 )
 
 // removeAllFn as a function for mocking

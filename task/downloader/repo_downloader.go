@@ -39,7 +39,6 @@ func (r *repoDownloader) download(ctx context.Context, dir string, repo *task.Re
 		// exit if the destination already exists
 		return dest, nil
 	}
-
 	if repo.Download != "" {
 		return dest, r.downloadRepo(ctx, repo, dest)
 	}
@@ -47,18 +46,21 @@ func (r *repoDownloader) download(ctx context.Context, dir string, repo *task.Re
 }
 
 func (r *repoDownloader) clone(ctx context.Context, repo *task.Repository, dest string) error {
-	log := logger.FromContext(ctx)
 
 	// extract the clone url, ref and sha
 	url := repo.Clone
 	ref := repo.Ref
 	sha := repo.Sha
 
-	log.With("source", url).
-		With("revision", ref).
-		With("sha", sha).
-		With("target", dest).
-		Debug("clone artifact")
+	log := logger.FromContext(ctx).
+		WithFields(map[string]interface{}{
+			"source":   url,
+			"revision": ref,
+			"sha":      sha,
+			"target":   dest,
+		})
+
+	log.Debug("clone artifact")
 
 	// clone the repository
 	err := r.cloner.Clone(ctx, cloner.Params{
@@ -75,7 +77,6 @@ func (r *repoDownloader) clone(ctx context.Context, repo *task.Repository, dest 
 }
 
 func (r *repoDownloader) downloadRepo(ctx context.Context, repo *task.Repository, destDir string) error {
-	log := logger.FromContext(ctx)
 
 	dest := getDownloadPath(repo.Download, destDir)
 	downloadPath, err := downloadFile(ctx, repo.Download, dest)
@@ -91,9 +92,13 @@ func (r *repoDownloader) downloadRepo(ctx context.Context, repo *task.Repository
 		return err
 	}
 
-	log.With("source", repo.Download).
-		With("destination", dest).
-		Debug("extracted artifact")
+	log := logger.FromContext(ctx).
+		WithFields(map[string]interface{}{
+			"source":      repo.Download,
+			"destination": dest,
+		})
+
+	log.Debug("extracted artifact")
 
 	// delete the archive file after unpacking
 	os.Remove(downloadPath)
