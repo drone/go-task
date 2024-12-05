@@ -81,7 +81,7 @@ func (e *Execer) Exec(ctx context.Context, in []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read CGI output: %w", err)
 	}
 
-	log.Infof("Captured CGI output: %s", stderrBuf.String())
+	log.Infof("Captured CGI logs: %s", stderrBuf.String())
 	// check the error code and write the error
 	// to the context, if applicable.
 	// TODO should we unmarshal the response body to an error type?
