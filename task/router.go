@@ -65,7 +65,7 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 			"task.type":   req.Task.Type,
 			"task.driver": req.Task.Driver,
 		})
-	log.Debug("route task")
+	log.WithContext(ctx).Debug("route task")
 
 	// handle each secret sub-task before handling
 	// the primary task
