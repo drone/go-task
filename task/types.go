@@ -40,13 +40,14 @@ type Forward struct {
 // Logger provides instructions for logging the output
 // of a task execution.
 type Logger struct {
-	Address           string `json:"address"`
-	Insecure          bool   `json:"insecure"`
-	Token             string `json:"token"`
-	Key               string `json:"key"`
-	Account           string `json:"account"`
-	IndirectUpload    bool   `json:"indirect_upload"`
-	SkipOpeningStream bool   `json:"skip_opening_stream"`
+	Address           string   `json:"address"`
+	Insecure          bool     `json:"insecure"`
+	Token             string   `json:"token"`
+	Key               string   `json:"key"`
+	Account           string   `json:"account"`
+	IndirectUpload    bool     `json:"indirect_upload"`
+	SkipOpeningStream bool     `json:"skip_opening_stream"`
+	Masks             []string `json:"masks"`
 }
 
 // Certs provides tls certificates.
