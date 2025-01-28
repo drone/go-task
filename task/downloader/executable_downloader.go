@@ -43,17 +43,19 @@ func (e *executableDownloader) download(ctx context.Context, dir string, taskTyp
 		return "", fmt.Errorf("os [%s] and architecture [%s] are not specified in executable configuration", operatingSystem, architecture)
 	}
 
-	destDir := filepath.Join(dir, taskType, getHash(url))
-	dest := getDownloadPath(url, destDir)
+	destDir := filepath.Join(dir, taskType, exec.Name)
+	// {baseDir}/taskType/{name}/{name}-{version}-{os}-{arch}
+	// download to a file named by this runner to make sure upstream changes doesn't affect the cache hit lookup
+	dest := filepath.Join(destDir, exec.Name+"-"+exec.Version+"-"+operatingSystem+"-"+architecture)
 
-	if cacheHit := isCacheHitFn(ctx, destDir); cacheHit {
+	if cacheHit := isCacheHitFn(ctx, dest); cacheHit {
 		// exit if the artifact destination already exists
 		return dest, nil
 	}
 
 	// if no cache hit, remove all downloaded executables for this task's type
 	// so that we don't keep multiple executables of the same type
-	err := removeAllFn(filepath.Join(dir, taskType))
+	err := removeAllFn(destDir)
 	if err != nil {
 		return "", err
 	}

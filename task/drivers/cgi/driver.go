@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/drone/go-task/task/logger"
+	"github.com/drone/go-task/task/packaged"
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/builder"
@@ -36,7 +37,8 @@ func New(d downloader.Downloader) task.Handler {
 }
 
 type driver struct {
-	downloader downloader.Downloader
+	downloader    downloader.Downloader
+	packageLoader packaged.PackageLoader
 }
 
 // Handle handles the task execution request.
@@ -50,7 +52,7 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 		return task.Error(err)
 	}
 
-	path, err := d.downloadArtifact(ctx, req.Task.Type, conf)
+	path, err := d.prepareArtifact(ctx, req.Task.Type, conf)
 	if err != nil {
 		log.WithError(err).Error("artifact download failed")
 		return task.Error(err)
@@ -74,11 +76,20 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 	return task.Respond(resp)
 }
 
-func (d *driver) downloadArtifact(ctx context.Context, taskType string, conf *Config) (string, error) {
+func (d *driver) prepareArtifact(ctx context.Context, taskType string, conf *Config) (string, error) {
+	// use binary artifact
 	if conf.ExecutableConfig != nil {
-		return d.downloader.DownloadExecutable(ctx, taskType, conf.ExecutableConfig)
+		if shouldUsePrepackagedBinary(conf) {
+			return d.packageLoader.GetPackagePath(ctx, taskType, conf.ExecutableConfig)
+		} else {
+			return d.downloader.DownloadExecutable(ctx, taskType, conf.ExecutableConfig)
+		}
 	}
 	return d.downloader.DownloadRepo(ctx, conf.Repository)
+}
+
+func shouldUsePrepackagedBinary(conf *Config) bool {
+	return len(conf.ExecutableConfig.Executables) == 0
 }
 
 func setDefaultConfigValues(conf *Config) {

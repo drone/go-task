@@ -71,6 +71,8 @@ type Repository struct {
 // supported operating systems and architectures
 type ExecutableConfig struct {
 	Executables []Executable `json:"executables"`
+	Name        string       `json:"name"`
+	Version     string       `json:"version"`
 }
 
 // Executable provides the url to download
