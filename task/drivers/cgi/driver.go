@@ -32,8 +32,8 @@ type Config struct {
 }
 
 // New returns the task execution driver.
-func New(d downloader.Downloader) task.Handler {
-	return &driver{downloader: d}
+func New(d downloader.Downloader, pl packaged.PackageLoader) task.Handler {
+	return &driver{downloader: d, packageLoader: pl}
 }
 
 type driver struct {
