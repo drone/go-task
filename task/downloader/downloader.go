@@ -6,7 +6,6 @@ package downloader
 
 import (
 	"context"
-	"path/filepath"
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
@@ -22,15 +21,9 @@ type Downloader struct {
 }
 
 func New(cloner cloner.Cloner, dir string) Downloader {
-	baseDir := getBaseDownloadDir(dir)
 	repoDownloader := newRepoDownloader(cloner)
 	executableDownloader := newExecutableDownloader()
-	return Downloader{dir: baseDir, repoDownloader: repoDownloader, executableDownloader: executableDownloader}
-}
-
-// getBaseDownloadDir returns the top-level directory where all files should be downloaded
-func getBaseDownloadDir(dir string) string {
-	return filepath.Join(dir, ".harness", "cache")
+	return Downloader{dir: dir, repoDownloader: repoDownloader, executableDownloader: executableDownloader}
 }
 
 func (d *Downloader) DownloadRepo(ctx context.Context, repo *task.Repository) (string, error) {

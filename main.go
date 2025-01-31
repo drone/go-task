@@ -12,11 +12,13 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
 	download "github.com/drone/go-task/task/downloader"
 	"github.com/drone/go-task/task/drivers/cgi"
+	"github.com/drone/go-task/task/packaged"
 )
 
 var (
@@ -98,8 +100,9 @@ func main() {
 		cloner.Default(),
 
 		// top-level directory where the downloading should happen
-		cache,
+		filepath.Join(cache, "download"),
 	)
+	packageLoader := packaged.New(filepath.Join(cache, "default"))
 
 	// create the task router
 	router := task.NewRouter()
@@ -112,6 +115,7 @@ func main() {
 			// use the default downloader which
 			// caches tasks at ~/.cache/harness/task
 			downloader,
+			packageLoader,
 		),
 	)
 
