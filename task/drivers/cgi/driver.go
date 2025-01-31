@@ -54,7 +54,7 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 
 	path, err := d.prepareArtifact(ctx, req.Task.Type, conf)
 	if err != nil {
-		log.WithError(err).Error("artifact download failed")
+		log.WithError(err).Error("Prepare artifact failed")
 		return task.Error(err)
 	}
 
