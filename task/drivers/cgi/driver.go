@@ -79,10 +79,13 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 func (d *driver) prepareArtifact(ctx context.Context, taskType string, conf *Config) (string, error) {
 	// use binary artifact
 	if conf.ExecutableConfig != nil {
-		if shouldUsePrepackagedBinary(conf) {
-			return d.packageLoader.GetPackagePath(ctx, taskType, conf.ExecutableConfig)
-		} else {
+		cgiPath, err := d.packageLoader.GetPackagePath(ctx, taskType, conf.ExecutableConfig)
+		if err != nil {
 			return d.downloader.DownloadExecutable(ctx, taskType, conf.ExecutableConfig)
+		} else {
+			log := logger.FromContext(ctx)
+			log.WithField("path", cgiPath).Info("using prepackaged binary")
+			return cgiPath, nil
 		}
 	}
 	return d.downloader.DownloadRepo(ctx, conf.Repository)

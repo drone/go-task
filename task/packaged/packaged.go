@@ -47,5 +47,5 @@ func getFirstFile(directory string) (string, error) {
 	}
 
 	// If no files are found, return an error
-	return "", fmt.Errorf("no files found in directory: %s", directory)
+	return "", fmt.Errorf("no cgi found in directory: %s", directory)
 }
