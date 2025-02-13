@@ -29,7 +29,14 @@ func New(dir string) PackageLoader {
 
 func (p *PackageLoader) GetPackagePath(ctx context.Context, taskType string, exec *task.ExecutableConfig) (string, error) {
 	dir := filepath.Join(p.dir, taskType, exec.Name)
-	return getFirstFile(dir)
+	if path, err := getFirstFile(dir); err == nil {
+		if chModErr := os.Chmod(path, 0777); chModErr != nil {
+			return "", fmt.Errorf("failed to set executable flag in task file [%s]: %w", path, err)
+		}
+		return path, nil
+	} else {
+		return "", err
+	}
 }
 
 func getFirstFile(directory string) (string, error) {
@@ -47,5 +54,5 @@ func getFirstFile(directory string) (string, error) {
 	}
 
 	// If no files are found, return an error
-	return "", fmt.Errorf("no files found in directory: %s", directory)
+	return "", fmt.Errorf("no cgi found in directory: %s", directory)
 }
