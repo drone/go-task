@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/logger"
 )
 
@@ -30,7 +31,7 @@ func newExecer(binpath string, cgiConfig *Config) *Execer {
 }
 
 // Exec executes the task given the binary filepath and the configuration
-func (e *Execer) Exec(ctx context.Context, in []byte) ([]byte, error) {
+func (e *Execer) Exec(ctx context.Context, in []byte) (*task.CGITaskResponse, error) {
 	conf := e.CGIConfig
 	log := logger.FromContext(ctx).WithFields(map[string]interface{}{
 		"cgi.dir":    filepath.Dir(e.Binpath),
@@ -82,12 +83,13 @@ func (e *Execer) Exec(ctx context.Context, in []byte) ([]byte, error) {
 	}
 
 	log.Infof("Captured CGI logs: %s", stderrBuf.String())
-	// check the error code and write the error
-	// to the context, if applicable.
-	// TODO should we unmarshal the response body to an error type?
-	if responseRecorder.Code > 299 {
-		return nil, fmt.Errorf("received error code %d", responseRecorder.Code)
-	}
+	return &task.CGITaskResponse{StatusCode: responseRecorder.Code, Body: responseRecorder.Body.Bytes(), Headers: headerToMap(responseRecorder.Header())}, nil
+}
 
-	return responseRecorder.Body.Bytes(), nil
+func headerToMap(header http.Header) map[string][]string {
+	headerMap := make(map[string][]string)
+	for key, values := range header {
+		headerMap[key] = values
+	}
+	return headerMap
 }

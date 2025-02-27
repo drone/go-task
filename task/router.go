@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"io"
 
@@ -105,17 +106,26 @@ func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) ([]*common.S
 		if err := res.Error(); err != nil {
 			return nil, err
 		}
+		out := new(CGITaskResponse)
 
 		// attempt to unmarshal the task response
 		// body into the secrets struct.
-		out := new(common.Secret)
-		if err := json.Unmarshal(res.Body(), &out); err != nil {
+		//out := new(common.Secret)
+		if err := json.Unmarshal(res.Body(), out); err != nil {
 			return nil, err
 		}
-		out.ID = subtask.ID
+		// Check whether it's a successful CGI call. Fail the task if it's not, as we can't proceed without the secret.
+		if out.StatusCode > 299 {
+			return nil, fmt.Errorf("failed to retrieve secret: %s. %s", subtask.ID, out.Body)
+		}
+		secretOutput := new(common.Secret)
+		if err := json.Unmarshal(out.Body, secretOutput); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal secret: %s. %s", subtask.ID, err)
+		}
+		secretOutput.ID = subtask.ID
 
 		// add the secret to request
-		secrets = append(secrets, out)
+		secrets = append(secrets, secretOutput)
 	}
 	return secrets, nil
 }
