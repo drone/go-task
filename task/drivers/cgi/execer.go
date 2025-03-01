@@ -6,6 +6,7 @@ package cgi
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -83,7 +84,8 @@ func (e *Execer) Exec(ctx context.Context, in []byte) (*task.CGITaskResponse, er
 	}
 
 	log.Infof("Captured CGI logs: %s", stderrBuf.String())
-	return &task.CGITaskResponse{StatusCode: responseRecorder.Code, Body: responseRecorder.Body.Bytes(), Headers: headerToMap(responseRecorder.Header())}, nil
+	encodedBody := base64.StdEncoding.EncodeToString(responseRecorder.Body.Bytes())
+	return &task.CGITaskResponse{StatusCode: responseRecorder.Code, Body: encodedBody, Headers: headerToMap(responseRecorder.Header())}, nil
 }
 
 func headerToMap(header http.Header) map[string][]string {

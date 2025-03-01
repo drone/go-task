@@ -7,6 +7,7 @@ package task
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -106,20 +107,32 @@ func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) ([]*common.S
 		if err := res.Error(); err != nil {
 			return nil, err
 		}
-		out := new(CGITaskResponse)
 
-		// attempt to unmarshal the task response
-		// body into the secrets struct.
-		//out := new(common.Secret)
-		if err := json.Unmarshal(res.Body(), out); err != nil {
-			return nil, err
+		var secretOutputBytes []byte
+		if subtask.Driver != "cgi" && len(subtask.Config) == 0 {
+			// This is not CGI task
+			secretOutputBytes = res.Body()
+		} else {
+			// This is CGI task
+			// Decode the response body into a temporary
+			// data structure.
+			out := new(CGITaskResponse)
+			if err := json.Unmarshal(res.Body(), out); err != nil {
+				return nil, err
+			}
+			// Check whether it's a successful CGI call. Fail the task if it's not, as we can't proceed without the secret.
+			if out.StatusCode > 299 {
+				return nil, fmt.Errorf("failed to retrieve secret: %s. %s", subtask.ID, out.Body)
+			}
+			if decodedBody, err := base64.StdEncoding.DecodeString(out.Body); err != nil {
+				return nil, fmt.Errorf("failed to decode secret data: %s. %s", subtask.ID, err)
+			} else {
+				secretOutputBytes = decodedBody
+			}
 		}
-		// Check whether it's a successful CGI call. Fail the task if it's not, as we can't proceed without the secret.
-		if out.StatusCode > 299 {
-			return nil, fmt.Errorf("failed to retrieve secret: %s. %s", subtask.ID, out.Body)
-		}
+
 		secretOutput := new(common.Secret)
-		if err := json.Unmarshal(out.Body, secretOutput); err != nil {
+		if err := json.Unmarshal(secretOutputBytes, secretOutput); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal secret: %s. %s", subtask.ID, err)
 		}
 		secretOutput.ID = subtask.ID

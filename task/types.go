@@ -87,7 +87,7 @@ type Executable struct {
 type CGITaskResponse struct {
 	StatusCode int                 `json:"status_code"`
 	Headers    map[string][]string `json:"headers"`
-	Body       []byte              `json:"body"`
+	Body       string              `json:"body"`  // base64 encoded
 }
 
 // type State struct {
