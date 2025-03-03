@@ -84,6 +84,12 @@ type Executable struct {
 	Url  string `json:"url"`
 }
 
+type CGITaskResponse struct {
+	StatusCode int                 `json:"status_code"`
+	Headers    map[string][]string `json:"headers"`
+	Body       string              `json:"body"`  // base64 encoded
+}
+
 // type State struct {
 // 	// ID provides a unique task identifier.
 // 	ID string `json:"id"`
