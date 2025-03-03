@@ -109,7 +109,7 @@ func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) ([]*common.S
 		}
 
 		var secretOutputBytes []byte
-		if subtask.Driver != "cgi" && len(subtask.Config) == 0 {
+		if subtask.Driver != "cgi" && subtask.Type != "cgi" {
 			// This is not CGI task
 			secretOutputBytes = res.Body()
 		} else {

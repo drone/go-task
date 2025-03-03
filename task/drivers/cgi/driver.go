@@ -7,6 +7,7 @@ package cgi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 
 	"github.com/drone/go-task/task/logger"
@@ -77,7 +78,7 @@ func (d *driver) Handle(ctx context.Context, req *task.Request) task.Response {
 }
 
 func (d *driver) prepareArtifact(ctx context.Context, taskType string, conf *Config) (string, error) {
-	// use binary artifact
+	// use binary artifact, packaged or downloaded
 	if conf.ExecutableConfig != nil {
 		cgiPath, err := d.packageLoader.GetPackagePath(ctx, taskType, conf.ExecutableConfig)
 		if err != nil {
@@ -87,8 +88,11 @@ func (d *driver) prepareArtifact(ctx context.Context, taskType string, conf *Con
 			log.WithField("path", cgiPath).Info("using prepackaged binary")
 			return cgiPath, nil
 		}
+	} else if conf.Repository != nil {
+		return d.downloader.DownloadRepo(ctx, conf.Repository)
+	} else {
+		return "", errors.New("no executable or repository provided")
 	}
-	return d.downloader.DownloadRepo(ctx, conf.Repository)
 }
 
 func shouldUsePrepackagedBinary(conf *Config) bool {
