@@ -120,14 +120,16 @@ func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) ([]*common.S
 			if err := json.Unmarshal(res.Body(), out); err != nil {
 				return nil, err
 			}
-			// Check whether it's a successful CGI call. Fail the task if it's not, as we can't proceed without the secret.
-			if out.StatusCode > 299 {
-				return nil, fmt.Errorf("failed to retrieve secret: %s. %s", subtask.ID, out.Body)
-			}
+
 			if decodedBody, err := base64.StdEncoding.DecodeString(out.Body); err != nil {
-				return nil, fmt.Errorf("failed to decode secret data: %s. %s", subtask.ID, err)
+				return nil, fmt.Errorf("failed to decode plugin response: %s. %s", subtask.ID, err)
 			} else {
-				secretOutputBytes = decodedBody
+				if out.StatusCode > 299 {
+					// Check whether it's a successful CGI call. Fail the task if it's not, as we can't proceed without the secret.
+					return nil, fmt.Errorf("failed to retrieve secret: %s. %s", subtask.ID, decodedBody)
+				} else {
+					secretOutputBytes = decodedBody
+				}
 			}
 		}
 
