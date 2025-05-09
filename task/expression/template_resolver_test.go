@@ -14,7 +14,7 @@ func TestTemplateResolver_Resolve(t *testing.T) {
 		{ID: "xyz", Value: "222"},
 	}
 	resolver := newTemplateResolver(secrets)
-	input := []byte("my secret value: #{{ .secrets.abc}} and another: #{{.secrets.xyz}}")
+	input := []byte("my secret value: #{{ .secrets.abc}} and another: <{.secrets.xyz}>")
 	expected := "my secret value: 111 and another: 222"
 
 	// Act
@@ -31,7 +31,7 @@ func TestTemplateResolver_Resolve_MissingSecret(t *testing.T) {
 		{ID: "abc", Value: "111"},
 	}
 	resolver := newTemplateResolver(secrets)
-	input := []byte("my secret value: #{{ .secrets.missing }}")
+	input := []byte("my secret value: <{ .secrets.missing }>")
 	expected := "my secret value: <no value>"
 
 	// Act
@@ -48,7 +48,7 @@ func TestTemplateResolver_Resolve_InvalidTemplate(t *testing.T) {
 		{ID: "abc", Value: "111"},
 	}
 	resolver := newTemplateResolver(secrets)
-	input := []byte("my secret value: #{{ .secrets.abc")
+	input := []byte("my secret value: <{ .secrets.abc")
 
 	// Act
 	output, err := resolver.Resolve(input)
@@ -64,8 +64,8 @@ func TestTemplateResolver_Resolve_WithGetAsBase64(t *testing.T) {
 		{ID: "abc", Value: "mySecretValue"},
 	}
 	resolver := newTemplateResolver(secrets)
-	input1 := []byte("my secret value in base64: #{{.secrets.abc | getAsBase64 }}")
-	expected1 := "my secret value in base64: bXlTZWNyZXRWYWx1ZQ==" // Base64 encoding of "mySecretValue"
+	input1 := []byte("my secret value in base64: <{ printf \"username: %s\" .secrets.abc | getAsBase64 }>")
+	expected1 := "my secret value in base64: dXNlcm5hbWU6IG15U2VjcmV0VmFsdWU=" // Base64 encoding of "mySecretValue"
 
 	// Act
 	output1, err := resolver.Resolve(input1)

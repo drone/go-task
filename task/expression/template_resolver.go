@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	RESOLVER_DELIM_START = "#{{"
-	RESOLVER_DELIM_END   = "}}"
+	RESOLVER_DELIM_START = "<{"
+	RESOLVER_DELIM_END   = "}>"
 )
 
 type TemplateResolver struct {
