@@ -5,7 +5,6 @@
 package task
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -146,15 +145,12 @@ func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) ([]*common.S
 }
 
 func (h *Router) ResolveExpressions(ctx context.Context, secrets []*common.Secret, taskData []byte) ([]byte, error) {
-	if bytes.Contains(taskData, []byte("${{")) {
-		resolver := expression.New(secrets)
-		resolvedTaskData, err := resolver.Resolve(taskData)
-		if err != nil {
-			return nil, err
-		}
-		return resolvedTaskData, nil
+	resolver := expression.New(secrets)
+	resolvedTaskData, err := resolver.Resolve(taskData)
+	if err != nil {
+		return nil, err
 	}
-	return taskData, nil
+	return resolvedTaskData, nil
 }
 
 // handle routes the task request to a handler.
