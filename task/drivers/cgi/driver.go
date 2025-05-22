@@ -106,6 +106,12 @@ func setDefaultConfigValues(conf *Config) {
 	if conf.Endpoint == "" {
 		conf.Endpoint = "/"
 	}
+	// Always set RUN_AS_CGI=true for the CGI server process.
+	// In case the cgi's binary has other modes for running
+	// (like starting an HTTP or gRPC server) the cgi's application
+	// can use this environment variable to decide if it needs to
+	// start a CGI server.
+	conf.Envs = append(conf.Envs, "RUN_AS_CGI=true")
 }
 
 func (d *driver) getBinaryPath(ctx context.Context, path string, conf *Config) (string, error) {
