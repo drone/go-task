@@ -47,6 +47,8 @@ type Logger struct {
 	Account           string   `json:"account"`
 	IndirectUpload    bool     `json:"indirect_upload"`
 	SkipOpeningStream bool     `json:"skip_opening_stream"`
+	TrimNewLineSuffix bool     `json:"trim_new_line_suffix"`
+	IncreaseLogLimit  bool     `json:"increase_log_limit"`
 	Masks             []string `json:"masks"`
 }
 
@@ -87,7 +89,7 @@ type Executable struct {
 type CGITaskResponse struct {
 	StatusCode int                 `json:"status_code"`
 	Headers    map[string][]string `json:"headers"`
-	Body       string              `json:"body"`  // base64 encoded
+	Body       string              `json:"body"` // base64 encoded
 }
 
 // type State struct {
