@@ -1,0 +1,270 @@
+// Copyright 2025 Harness Inc. All rights reserved.
+// Use of this source code is governed by the PolyForm Free Trial 1.0.0 license
+// that can be found in the licenses directory at the root of this repository, also available at
+// https://polyformproject.org/wp-content/uploads/2020/05/PolyForm-Free-Trial-1.0.0.txt.
+
+syntax = "proto3";
+
+package io.harness.product.ci.engine.proto;
+
+option java_multiple_files = true;
+option go_package = "github.com/drone/go-task/k8s-engine-commons/proto;proto";
+
+import "proto/publish_artifact.proto";
+
+enum ShellType {
+  SH = 0;
+  BASH = 1;
+  POWERSHELL = 2;
+  PWSH = 3;
+  PYTHON = 4;
+  SHELL_TYPE_UNSPECIFIED = 5;
+}
+
+message StepContext {
+  int32 num_retries = 1;  // Deprecated
+  int64 execution_timeout_secs = 2;
+}
+
+message PublishArtifactsStep {
+  repeated UploadFile files = 1;
+  repeated BuildPublishImage images = 2;
+}
+
+message Report {
+  enum Type {
+    UNKNOWN = 0;
+    JUNIT = 1;
+  }
+  Type type = 2;
+  // List of paths to collect reports from. Can be regex as well.
+  repeated string paths = 3;
+}
+
+message RunTestsStep {
+  string args = 1;
+  string language = 2;   // language used for running tests. Java | Python | Go etc.
+  string buildTool = 3;  // build tool used for running tests. maven | bazel | gradle.
+  string testAnnotations = 4;
+  string packages = 5;
+  bool runOnlySelectedTests = 6;
+  StepContext context = 7;
+  uint32 container_port = 8;           // Port of the container on which run step needs to be executed.
+  repeated Report reports = 9;         // Spec for publishing junit reports
+  string preTestCommand = 10;          // Pre-commands to setup environment before running tests
+  string postTestCommand = 11;         // Post commands after running tests
+  repeated string envVarOutputs = 12;  // produced output variables
+  // TODO (Vistaar): Proxy this call from addon to LE.
+  string diff_files = 13;
+  map<string, string> environment = 14;
+  string buildEnvironment = 15;  // Dot net build environment Core | Framework
+  string frameworkVersion = 16;  // Dot net version 6.0 | 5.0
+  string namespaces = 17;        // Same function as java package for namespace languages
+  string test_split_strategy = 18;
+  bool parallelize_tests = 19;
+  string test_globs = 20;  // Comma separated strings which are test globs
+  string pythonVersion = 21;
+  string testRoot = 22;
+  repeated OutputVariable outputs = 23;
+  bool parse_savings = 24;
+}
+
+message RunStep {
+  string command = 1;
+  StepContext context = 2;
+  repeated string env_var_outputs = 3;  // output variables to export as step outcome
+  uint32 container_port = 4;            // Deprecated. Port of the container on which run step needs to be executed
+  repeated Report reports = 5;
+  map<string, string> environment = 6;
+  ShellType shell_type = 7;
+  bool detach = 8;
+  repeated string entrypoint = 9;
+  string image = 10;
+  repeated OutputVariable outputs = 11;
+  bool parse_savings = 12;
+  bool script_secrets_runtime = 13;
+  repeated File files = 14;
+}
+
+message OutputVariable {
+  enum OutputType {
+    STRING = 0;
+    SECRET = 1;
+  }
+  OutputType type = 2;
+  string key = 3;
+  string value = 4;
+}
+
+message RunTestStepV2 {
+  string command = 1;
+  StepContext context = 2;
+  repeated string env_var_outputs = 3;
+  uint32 container_port = 4;
+  repeated Report reports = 5;
+  map<string, string> environment = 6;
+  ShellType shell_type = 7;
+  repeated string entrypoint = 8;
+  string image = 9;
+  repeated OutputVariable outputs = 10;
+  string diff_files = 11;
+  bool intelligence_mode = 12;
+  repeated string globs = 13;
+  bool parse_savings = 14;
+}
+
+message PluginStep {
+  string image = 1;
+  StepContext context = 2;
+  // Deprecated. Port of the container on which plugin step needs to be executed
+  uint32 container_port = 3;
+  // Optional. Entrypoint for plugin step. If empty, it calls docker registry to retrieve the entrypoint
+  repeated string entrypoint = 4;
+  map<string, string> environment = 5;
+  string artifact_file_path = 6;  // file path to store generated artifact file
+  repeated Report reports = 7;
+  repeated string env_var_outputs = 8;  // output variables to export as step outcome
+  bool parse_savings = 9;
+}
+
+message SaveCacheStep {
+  string key = 1;
+  repeated string paths = 2;
+}
+
+message RestoreCacheStep {
+  string key = 1;
+  bool fail_if_not_exist = 2;
+}
+
+message ExecuteStep {
+  bytes task_parameters = 1;
+  string execute_command = 2;
+  ShellType shell_type = 3;
+  repeated string env_var_outputs = 4;  // output variables to export as step outcome
+}
+
+message UnitStep {
+  string id = 1;
+  string display_name = 2;
+  oneof step {
+    RunStep run = 3;
+    SaveCacheStep save_cache = 4;
+    RestoreCacheStep restore_cache = 5;
+    PublishArtifactsStep publish_artifacts = 6;
+    PluginStep plugin = 9;
+    RunTestsStep runTests = 10;
+    ExecuteStep executeTask = 15;
+    RunTestStepV2 runTestStepV2 = 16;
+  }
+  string callback_token = 7;
+  string task_id = 8;
+  string skip_condition = 11;
+  string log_key = 12;
+  string account_id = 13;
+  uint32 container_port = 14;                  // Port of the container on which step needs to be executed
+  map<string, string> connector_secrets = 18;  // The secrets which will be added at step execution
+  repeated string runtime_secrets = 17;
+}
+
+message ParallelStep {
+  string id = 1;
+  string display_name = 2;
+  repeated UnitStep steps = 3;
+}
+
+message Step {
+  oneof step {
+    ParallelStep parallel = 1;
+    UnitStep unit = 2;
+  }
+}
+
+message Execution {
+  repeated Step steps = 1;
+  string account_id = 2;
+}
+
+message UpdateStateRequest {
+  enum Action {
+    UNKNOWN = 0;
+    PAUSE = 1;
+    RESUME = 2;
+  }
+  Action action = 1;
+}
+
+message UpdateStateResponse {}
+
+message GetImageEntrypointRequest {
+  string id = 1;
+  string image = 2;
+  string secret = 3;  // docker config secret for image
+}
+
+message GetImageEntrypointResponse {
+  repeated string entrypoint = 1;
+  repeated string args = 2;
+}
+
+message StepOutput {
+  map<string, string> output = 2;
+}
+
+message EvaluateJEXLRequest {
+  string step_id = 1;
+  repeated string expressions = 2;
+  map<string, StepOutput> step_outputs = 3;  // Output of all the previously executed steps of a stage
+}
+
+message EvaluateJEXLResponse {
+  map<string, string> evaluated_expressions = 1;  // expression is key & value is evaluated expression
+}
+
+message PingRequest {}
+
+message PingResponse {}
+
+message ExecuteStepRequest {
+  string execution_id = 1;
+  UnitStep step = 2;
+  string tmp_file_path = 3;
+  string delegate_svc_endpoint = 4;
+  string manager_svc_endpoint = 5;
+  string account_key = 6;
+  string manager_url = 7;
+  string delegate_id = 8;
+  string marker_file_uuid = 9;
+  bool is_runner = 10;  // Used for sending runner task response instead of delegate's
+}
+
+message ExecuteStepResponse {}
+
+service LiteEngine {
+  // Synchronous RPC to execute a step
+  // Deprecated
+  rpc UpdateState(UpdateStateRequest) returns (UpdateStateResponse);
+
+  // Synchronous RPC to fetch image entrypoint
+  rpc GetImageEntrypoint(GetImageEntrypointRequest) returns (GetImageEntrypointResponse);
+
+  // Synchronous RPC to evaluate JEXL expression
+  rpc EvaluateJEXL(EvaluateJEXLRequest) returns (EvaluateJEXLResponse);
+
+  // Synchronous RPC to check health of lite-engine service.
+  rpc Ping(PingRequest) returns (PingResponse);
+
+  // Asynchronous RPC that starts execution of a step.
+  // It is idempotent such that if two requests are fired with same id, then
+  // only one request will start execution of the step.
+  rpc ExecuteStep(ExecuteStepRequest) returns (ExecuteStepResponse);
+}
+
+message OutputVariablesWrapper {
+  repeated OutputVariable output_variables = 1;
+}
+
+message File {
+  string data = 1;
+  string path = 2;
+}
