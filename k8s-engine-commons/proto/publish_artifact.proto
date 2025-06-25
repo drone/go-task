@@ -1,0 +1,59 @@
+// Copyright 2021 Harness Inc. All rights reserved.
+// Use of this source code is governed by the PolyForm Free Trial 1.0.0 license
+// that can be found in the licenses directory at the root of this repository, also available at
+// https://polyformproject.org/wp-content/uploads/2020/05/PolyForm-Free-Trial-1.0.0.txt.
+
+syntax = "proto3";
+
+package io.harness.product.ci.engine.proto;
+
+option java_multiple_files = true;
+option go_package = "github.com/drone/go-task/k8s-engine-commons/proto;proto";
+
+enum LocationType {
+  UNKNOWN = 0;  // Default value of enum is 0
+  // Artifactories
+  S3 = 1;
+  GCS = 2;
+  JFROG = 3;
+  // Registries
+  GCR = 4;
+  ECR = 5;
+  DOCKERHUB = 6;
+}
+
+enum AuthType {
+  BASIC_AUTH = 0;   // Assumes USERNAME_id and PASSWORD_id to be present
+  SECRET_FILE = 1;  // Assumes SECRET_PATH_id to be present
+  ACCESS_KEY = 2;   // Assumes ACCESS_KEY_id and/or SECRET_KEY_id to be present
+}
+
+// Task global unique identifier
+message TaskId {
+  string id = 1;
+}
+
+// Details of connector
+message Connector {
+  string id = 1;
+  AuthType auth = 2;
+}
+
+message BuildPublishImage {
+  string docker_file = 1;
+  string context = 2;
+  Destination destination = 3;
+}
+
+message UploadFile {
+  string file_pattern = 1;
+  Destination destination = 2;  // location to copy the file
+}
+
+// Destination to upload to
+message Destination {
+  string destination_url = 1;
+  Connector connector = 2;
+  LocationType location_type = 3;
+  string region = 4;  // Valid only for S3 connector
+}
