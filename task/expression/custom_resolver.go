@@ -1,6 +1,7 @@
 package expression
 
 import (
+	"bytes"
 	"encoding/json"
 
 	"github.com/drone/go-task/task/common"
@@ -36,10 +37,20 @@ func (r *CustomResolver) Resolve(data []byte) ([]byte, error) {
 	// evaluate the expressions
 	evaler.Eval(v, r.secrets)
 
-	// encode the map back to []byte
-	resolved, err := json.Marshal(v)
+	// create an encoder that doesn't escape HTML characters
+	encoder := json.NewEncoder(&bytes.Buffer{})
+	encoder.SetEscapeHTML(false)
+
+	// encode the map back to []byte using the custom encoder
+	buf := &bytes.Buffer{}
+	encoder = json.NewEncoder(buf)
+	encoder.SetEscapeHTML(false)
+	err = encoder.Encode(v)
 	if err != nil {
 		return nil, err
 	}
+
+	// trim the trailing newline that Encode adds
+	resolved := bytes.TrimSpace(buf.Bytes())
 	return resolved, nil
 }

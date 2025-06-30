@@ -19,19 +19,25 @@ func New(secrets []*common.Secret) *Resolver {
 }
 
 func (r *Resolver) Resolve(taskData []byte) ([]byte, error) {
-	if bytes.Contains(taskData, []byte("${{secrets")) {
-		resolver := newCustomResolver(r.secrets)
-		resolvedTaskData, err := resolver.Resolve(taskData)
+	// Start with the original task data
+	currentData := taskData
+
+	// First pass: Handle custom secrets syntax (${{secrets...}})
+	if bytes.Contains(currentData, []byte("${{secrets")) {
+		customResolver := newCustomResolver(r.secrets)
+		resolvedData, err := customResolver.Resolve(currentData)
 		if err != nil {
 			return nil, err
 		}
-		return resolvedTaskData, nil
+		currentData = resolvedData // Update current data with resolved result
 	}
-	//return taskData, nil
-	resolver := newTemplateResolver(r.secrets)
-	resolvedTaskData, err := resolver.Resolve(taskData)
+
+	// Second pass: Handle template resolver syntax
+	templateResolver := newTemplateResolver(r.secrets)
+	finalResolvedData, err := templateResolver.Resolve(currentData)
 	if err != nil {
 		return nil, err
 	}
-	return resolvedTaskData, nil
+
+	return finalResolvedData, nil
 }
