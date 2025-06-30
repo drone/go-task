@@ -37,13 +37,9 @@ func (r *CustomResolver) Resolve(data []byte) ([]byte, error) {
 	// evaluate the expressions
 	evaler.Eval(v, r.secrets)
 
-	// create an encoder that doesn't escape HTML characters
-	encoder := json.NewEncoder(&bytes.Buffer{})
-	encoder.SetEscapeHTML(false)
-
-	// encode the map back to []byte using the custom encoder
+	// encode the map back to []byte using a custom encoder that doesn't escape HTML
 	buf := &bytes.Buffer{}
-	encoder = json.NewEncoder(buf)
+	encoder := json.NewEncoder(buf)
 	encoder.SetEscapeHTML(false)
 	err = encoder.Encode(v)
 	if err != nil {
