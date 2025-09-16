@@ -1315,6 +1315,20 @@ func (x *UnitStep) GetId() string {
 	return ""
 }
 
+func (x *UnitStep) GetSkipOpeningStream() bool {
+	if x != nil {
+		return x.SkipOpeningStream
+	}
+	return false
+}
+
+func (x *UnitStep) GetSkipClosingStream() bool {
+	if x != nil {
+		return x.SkipClosingStream
+	}
+	return false
+}
+
 func (x *UnitStep) GetDisplayName() string {
 	if x != nil {
 		return x.DisplayName
