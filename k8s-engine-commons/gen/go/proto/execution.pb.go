@@ -1272,6 +1272,8 @@ type UnitStep struct {
 	ContainerPort    uint32            `protobuf:"varint,14,opt,name=container_port,json=containerPort,proto3" json:"container_port,omitempty"`                                                                                   // Port of the container on which step needs to be executed
 	ConnectorSecrets map[string]string `protobuf:"bytes,18,rep,name=connector_secrets,json=connectorSecrets,proto3" json:"connector_secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // The secrets which will be added at step execution
 	RuntimeSecrets   []string          `protobuf:"bytes,17,rep,name=runtime_secrets,json=runtimeSecrets,proto3" json:"runtime_secrets,omitempty"`
+	SkipOpeningStream bool             `protobuf:"varint,19,opt,name=skip_opening_stream,json=skipOpeningStream,proto3" json:"skip_opening_stream"`
+	SkipClosingStream bool             `protobuf:"varint,20,opt,name=skip_closing_stream,json=skipClosingStream,proto3" json:"skip_closing_stream"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
