@@ -1263,17 +1263,19 @@ type UnitStep struct {
 	//	*UnitStep_RunTests
 	//	*UnitStep_ExecuteTask
 	//	*UnitStep_RunTestStepV2
-	Step             isUnitStep_Step   `protobuf_oneof:"step"`
-	CallbackToken    string            `protobuf:"bytes,7,opt,name=callback_token,json=callbackToken,proto3" json:"callback_token,omitempty"`
-	TaskId           string            `protobuf:"bytes,8,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
-	SkipCondition    string            `protobuf:"bytes,11,opt,name=skip_condition,json=skipCondition,proto3" json:"skip_condition,omitempty"`
-	LogKey           string            `protobuf:"bytes,12,opt,name=log_key,json=logKey,proto3" json:"log_key,omitempty"`
-	AccountId        string            `protobuf:"bytes,13,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	ContainerPort    uint32            `protobuf:"varint,14,opt,name=container_port,json=containerPort,proto3" json:"container_port,omitempty"`                                                                                   // Port of the container on which step needs to be executed
-	ConnectorSecrets map[string]string `protobuf:"bytes,18,rep,name=connector_secrets,json=connectorSecrets,proto3" json:"connector_secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // The secrets which will be added at step execution
-	RuntimeSecrets   []string          `protobuf:"bytes,17,rep,name=runtime_secrets,json=runtimeSecrets,proto3" json:"runtime_secrets,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	Step              isUnitStep_Step   `protobuf_oneof:"step"`
+	CallbackToken     string            `protobuf:"bytes,7,opt,name=callback_token,json=callbackToken,proto3" json:"callback_token,omitempty"`
+	TaskId            string            `protobuf:"bytes,8,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	SkipCondition     string            `protobuf:"bytes,11,opt,name=skip_condition,json=skipCondition,proto3" json:"skip_condition,omitempty"`
+	LogKey            string            `protobuf:"bytes,12,opt,name=log_key,json=logKey,proto3" json:"log_key,omitempty"`
+	AccountId         string            `protobuf:"bytes,13,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ContainerPort     uint32            `protobuf:"varint,14,opt,name=container_port,json=containerPort,proto3" json:"container_port,omitempty"`                                                                                   // Port of the container on which step needs to be executed
+	ConnectorSecrets  map[string]string `protobuf:"bytes,18,rep,name=connector_secrets,json=connectorSecrets,proto3" json:"connector_secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // The secrets which will be added at step execution
+	RuntimeSecrets    []string          `protobuf:"bytes,17,rep,name=runtime_secrets,json=runtimeSecrets,proto3" json:"runtime_secrets,omitempty"`
+	SkipOpeningStream bool              `protobuf:"varint,19,opt,name=skip_opening_stream,json=skipOpeningStream,proto3" json:"skip_opening_stream,omitempty"`
+	SkipClosingStream bool              `protobuf:"varint,20,opt,name=skip_closing_stream,json=skipClosingStream,proto3" json:"skip_closing_stream,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *UnitStep) Reset() {
@@ -1453,6 +1455,20 @@ func (x *UnitStep) GetRuntimeSecrets() []string {
 		return x.RuntimeSecrets
 	}
 	return nil
+}
+
+func (x *UnitStep) GetSkipOpeningStream() bool {
+	if x != nil {
+		return x.SkipOpeningStream
+	}
+	return false
+}
+
+func (x *UnitStep) GetSkipClosingStream() bool {
+	if x != nil {
+		return x.SkipClosingStream
+	}
+	return false
 }
 
 type isUnitStep_Step interface {
@@ -2494,7 +2510,7 @@ const file_proto_execution_proto_rawDesc = "" +
 	"\x0fexecute_command\x18\x02 \x01(\tR\x0eexecuteCommand\x12L\n" +
 	"\n" +
 	"shell_type\x18\x03 \x01(\x0e2-.io.harness.product.ci.engine.proto.ShellTypeR\tshellType\x12&\n" +
-	"\x0fenv_var_outputs\x18\x04 \x03(\tR\renvVarOutputs\"\x8f\t\n" +
+	"\x0fenv_var_outputs\x18\x04 \x03(\tR\renvVarOutputs\"\xef\t\n" +
 	"\bUnitStep\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12?\n" +
@@ -2516,7 +2532,9 @@ const file_proto_execution_proto_rawDesc = "" +
 	"account_id\x18\r \x01(\tR\taccountId\x12%\n" +
 	"\x0econtainer_port\x18\x0e \x01(\rR\rcontainerPort\x12o\n" +
 	"\x11connector_secrets\x18\x12 \x03(\v2B.io.harness.product.ci.engine.proto.UnitStep.ConnectorSecretsEntryR\x10connectorSecrets\x12'\n" +
-	"\x0fruntime_secrets\x18\x11 \x03(\tR\x0eruntimeSecrets\x1aC\n" +
+	"\x0fruntime_secrets\x18\x11 \x03(\tR\x0eruntimeSecrets\x12.\n" +
+	"\x13skip_opening_stream\x18\x13 \x01(\bR\x11skipOpeningStream\x12.\n" +
+	"\x13skip_closing_stream\x18\x14 \x01(\bR\x11skipClosingStream\x1aC\n" +
 	"\x15ConnectorSecretsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x06\n" +
