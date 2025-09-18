@@ -165,6 +165,8 @@ message UnitStep {
   uint32 container_port = 14;                  // Port of the container on which step needs to be executed
   map<string, string> connector_secrets = 18;  // The secrets which will be added at step execution
   repeated string runtime_secrets = 17;
+  bool skip_opening_stream = 19;
+  bool skip_closing_stream = 20;
 }
 
 message ParallelStep {
