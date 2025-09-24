@@ -82,7 +82,7 @@ func (d *driver) prepareArtifact(ctx context.Context, taskType string, conf *Con
 	if conf.ExecutableConfig != nil {
 		cgiPath, err := d.packageLoader.GetPackagePath(ctx, taskType, conf.ExecutableConfig)
 		if err != nil {
-			return d.downloader.DownloadExecutable(ctx, taskType, conf.ExecutableConfig)
+			return d.downloader.DownloadExecutable(ctx, taskType, conf.ExecutableConfig, false)
 		} else {
 			log := logger.FromContext(ctx)
 			log.WithField("path", cgiPath).Info("using prepackaged binary")

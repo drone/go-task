@@ -26,15 +26,10 @@ var (
 	downloadFileFn = downloadFile
 )
 
-// downloadFile fetches the file from url and writes it to dest
-func downloadFile(ctx context.Context, url, dest string) (string, error) {
-
-	log := logger.FromContext(ctx).
-		WithFields(map[string]interface{}{
-			"source":      url,
-			"destination": dest,
-		})
-	log.Debug("downloading artifact")
+// downloadFile fetches the file from a list of urls and writes it to dest.
+// It tries urls one by one until a download is successful.
+func downloadFile(ctx context.Context, urls []string, dest string) (string, error) {
+	log := logger.FromContext(ctx)
 
 	downloadDir := filepath.Dir(dest)
 	// create the directory where the target is downloaded.
@@ -42,30 +37,47 @@ func downloadFile(ctx context.Context, url, dest string) (string, error) {
 		return "", err
 	}
 
-	resp, err := httpGetFn(url)
-	if err != nil {
-		return "", fmt.Errorf("failed to download file: %w", err)
+	var lastErr error
+	for _, u := range urls {
+		log.WithFields(map[string]interface{}{
+			"source":      u,
+			"destination": dest,
+		}).Debug("attempting to download artifact")
+
+		resp, err := httpGetFn(u)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to download file from %s: %w", u, err)
+			log.WithError(lastErr).Warn("download attempt failed")
+			continue // try next url
+		}
+
+		if code := resp.StatusCode; code > 299 {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("download error with status code %d for url %s", code, u)
+			log.WithError(lastErr).Warn("download attempt failed")
+			continue // try next url
+		}
+
+		outFile, err := createFn(dest)
+		if err != nil {
+			resp.Body.Close()
+			return "", fmt.Errorf("failed to create file: %w", err)
+		}
+
+		_, err = copyFn(outFile, resp.Body)
+		outFile.Close()
+		resp.Body.Close()
+
+		if err != nil {
+			// This is a file writing error, not a download error. Fail immediately.
+			return "", fmt.Errorf("failed to write to file: %w", err)
+		}
+
+		log.Debug("downloaded artifact successfully")
+		return dest, nil // success
 	}
-	defer resp.Body.Close()
 
-	if code := resp.StatusCode; code > 299 {
-		return "", fmt.Errorf("download error with status code %d", code)
-	}
-
-	outFile, err := createFn(dest)
-	if err != nil {
-		return "", fmt.Errorf("failed to create file: %w", err)
-	}
-	defer outFile.Close()
-
-	_, err = copyFn(outFile, resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to write to file: %w", err)
-	}
-
-	log.Debug("downloaded artifact")
-
-	return dest, nil
+	return "", fmt.Errorf("failed to download file from all provided urls: %w", lastErr)
 }
 
 // getDownloadPath returns the full download path given the download url and the destination folder `dest`
