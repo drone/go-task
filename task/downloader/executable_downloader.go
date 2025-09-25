@@ -76,7 +76,7 @@ func (e *executableDownloader) download(ctx context.Context, dir string, taskTyp
 	e.logExecutableDownload(ctx, exec, operatingSystem, architecture)
 
 	if exec.Compressed {
-		binPath, err = decompressFile(binPath)
+		binPath, err = decompressFile(ctx, binPath)
 		if err != nil {
 			return "", fmt.Errorf("failed to decompress plugin [%s]: %w", binPath, err)
 		}
@@ -90,7 +90,7 @@ func (e *executableDownloader) download(ctx context.Context, dir string, taskTyp
 }
 
 // decompressFile decompresses a zstd file if needed
-func decompressFile(filePath string) (string, error) {
+func decompressFile(ctx context.Context, filePath string) (string, error) {
 	if !strings.HasSuffix(filePath, ".zst") {
 		return filePath, nil // Not a zstd file, return original path
 	}
@@ -115,6 +115,11 @@ func decompressFile(filePath string) (string, error) {
 		return "", fmt.Errorf("failed to decompress file: %v", err)
 	}
 
+	log := logger.FromContext(ctx)
+	// Remove the original compressed file after successful decompression
+	if err := os.Remove(filePath); err != nil {
+		log.Error(fmt.Sprintf("Failed to remove compressed file [%s] after decompression: %v", filePath, err))
+	}
 	return decompressedPath, nil
 }
 
