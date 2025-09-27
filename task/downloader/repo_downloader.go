@@ -79,7 +79,7 @@ func (r *repoDownloader) clone(ctx context.Context, repo *task.Repository, dest 
 func (r *repoDownloader) downloadRepo(ctx context.Context, repo *task.Repository, destDir string) error {
 
 	dest := getDownloadPath(repo.Download, destDir)
-	downloadPath, err := downloadFile(ctx, repo.Download, dest)
+	downloadPath, err := downloadFile(ctx, []string{repo.Download}, dest)
 	if err != nil {
 		// remove the destination directory if downloading fails so it can be retried
 		os.RemoveAll(dest)

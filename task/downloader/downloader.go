@@ -30,6 +30,6 @@ func (d *Downloader) DownloadRepo(ctx context.Context, repo *task.Repository) (s
 	return d.repoDownloader.download(ctx, d.dir, repo)
 }
 
-func (d *Downloader) DownloadExecutable(ctx context.Context, taskType string, exec *task.ExecutableConfig) (string, error) {
-	return d.executableDownloader.download(ctx, d.dir, taskType, exec)
+func (d *Downloader) DownloadExecutable(ctx context.Context, taskType string, exec *task.ExecutableConfig, fallbackEnabled bool) (string, error) {
+	return d.executableDownloader.download(ctx, d.dir, taskType, exec, fallbackEnabled)
 }
