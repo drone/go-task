@@ -77,6 +77,7 @@ type ExecutableConfig struct {
 	Name        string       `json:"name"`
 	Version     string       `json:"version"`
 	Compressed  bool         `json:"compressed"`
+	Target      string       `json:"target"`
 }
 
 // Executable provides the url to download
