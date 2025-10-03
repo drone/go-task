@@ -55,13 +55,7 @@ func (e *executableDownloader) download(ctx context.Context, dir string, taskTyp
 		// download to a file named by this runner to make sure upstream changes doesn't affect the cache hit lookup
 		dest = filepath.Join(destDir, exec.Name+"-"+exec.Version+"-"+operatingSystem+"-"+architecture)
 	} else {
-		dest = os.Expand(exec.Target, func(key string) string {
-			if val, ok := envs[key]; ok {
-				return val
-			}
-			return os.Getenv(key)
-		})
-		dest = os.ExpandEnv(dest)
+		dest = expandWithMapAndEnv(exec.Target, envs, 3)
 	}
 	if cacheHit := isCacheHitFn(ctx, dest); cacheHit {
 		// exit if the artifact destination already exists
@@ -101,6 +95,23 @@ func (e *executableDownloader) download(ctx context.Context, dir string, taskTyp
 		return "", fmt.Errorf("failed to set executable flag in task file [%s]: %w", binPath, err)
 	}
 	return binPath, nil
+}
+
+// $A → $B/foo
+// $B → $C/bar
+// $C → "/root"
+// with 3 levels, A resolves to /root/bar/foo
+func expandWithMapAndEnv(s string, envs map[string]string, levels int) string {
+	expanded := s
+	for i := 0; i < levels; i++ {
+		expanded = os.Expand(expanded, func(key string) string {
+			if val, ok := envs[key]; ok {
+				return val
+			}
+			return os.Getenv(key)
+		})
+	}
+	return expanded
 }
 
 // decompressFile decompresses a zstd file if needed

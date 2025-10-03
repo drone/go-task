@@ -109,14 +109,14 @@ func TestDownloadExecutable(t *testing.T) {
 				return nil
 			}
 
-			downloadFileFn = func(ctx context.Context, url, dest string) (string, error) {
+			downloadFileFn = func(ctx context.Context, urls []string, dest string) (string, error) {
 				if tt.downloadErr {
 					return "", fmt.Errorf("download error")
 				}
 				return dest, nil
 			}
 
-			_, err := downloader.download(context.Background(), tt.dir, tt.taskType, tt.exec)
+			_, err := downloader.download(context.Background(), tt.dir, tt.taskType, tt.exec, false, nil)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -165,9 +165,61 @@ func TestGetExecutableUrl(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			url, found := downloader.getExecutableUrl(tt.config, tt.operatingSystem, tt.architecture)
-			assert.Equal(t, tt.expectedUrl, url)
+			url, found := downloader.getExecutableUrl(tt.config, tt.operatingSystem, tt.architecture, false)
+			if len(url) > 0 {
+				assert.Equal(t, tt.expectedUrl, url[0])
+			} else {
+				assert.Equal(t, tt.expectedUrl, "")
+			}
 			assert.Equal(t, tt.found, found)
 		})
 	}
+}
+
+func TestExpandWithMapAndEnv(t *testing.T) {
+	t.Run("simple 1-level expansion", func(t *testing.T) {
+		envs := map[string]string{"CUSTOM_PATH": "/foo/bar"}
+		got := expandWithMapAndEnv("$CUSTOM_PATH", envs, 2)
+		want := "/foo/bar"
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("2-level expansion", func(t *testing.T) {
+		envs := map[string]string{"CUSTOM_PATH": "$HOME/bar", "HOME": "/root"}
+		got := expandWithMapAndEnv("$CUSTOM_PATH", envs, 2)
+		want := "/root/bar"
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("3-level expansion", func(t *testing.T) {
+		envs := map[string]string{"A": "$B/foo", "B": "$C/bar", "C": "/root"}
+		got := expandWithMapAndEnv("$A", envs, 3)
+		want := "/root/bar/foo"
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("env fallback", func(t *testing.T) {
+		os.Setenv("HOME", "/tmp/home")
+		envs := map[string]string{"CUSTOM_PATH": "$HOME/mydir"}
+		got := expandWithMapAndEnv("$CUSTOM_PATH", envs, 2)
+		want := "/tmp/home/mydir"
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("missing variable", func(t *testing.T) {
+		envs := map[string]string{}
+		got := expandWithMapAndEnv("$FOO", envs, 2)
+		want := ""
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
 }
