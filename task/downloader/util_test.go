@@ -94,7 +94,7 @@ func TestDownloadFile(t *testing.T) {
 				}
 			}
 
-			_, err := downloadFile(context.Background(), tt.url, tt.dest)
+			_, err := downloadFile(context.Background(), []string{tt.url}, tt.dest)
 			if gotErr := err != nil; gotErr != tt.wantErr {
 				t.Errorf("downloadFile() error = %v, wantErr %v", gotErr, tt.wantErr)
 			}

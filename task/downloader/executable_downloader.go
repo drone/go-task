@@ -8,13 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/klauspost/compress/zstd"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/klauspost/compress/zstd"
 
 	"github.com/drone/go-task/task/logger"
 
@@ -35,7 +36,7 @@ func newExecutableDownloader() *executableDownloader {
 	return &executableDownloader{}
 }
 
-func (e *executableDownloader) download(ctx context.Context, dir string, taskType string, exec *task.ExecutableConfig, fallbackEnabled bool) (string, error) {
+func (e *executableDownloader) download(ctx context.Context, dir string, taskType string, exec *task.ExecutableConfig, fallbackEnabled bool, envs map[string]string) (string, error) {
 	if exec == nil {
 		return "", errors.New("no executable urls provided to download")
 	}
@@ -46,11 +47,16 @@ func (e *executableDownloader) download(ctx context.Context, dir string, taskTyp
 		return "", fmt.Errorf("os [%s] and architecture [%s] are not specified in executable configuration", operatingSystem, architecture)
 	}
 
-	destDir := filepath.Join(dir, taskType, exec.Name)
-	// {baseDir}/taskType/{name}/{name}-{version}-{os}-{arch}
-	// download to a file named by this runner to make sure upstream changes doesn't affect the cache hit lookup
-	dest := filepath.Join(destDir, exec.Name+"-"+exec.Version+"-"+operatingSystem+"-"+architecture)
+	var destDir, dest string
 
+	if exec.Target == "" {
+		destDir = filepath.Join(dir, taskType, exec.Name)
+		// {baseDir}/taskType/{name}/{name}-{version}-{os}-{arch}
+		// download to a file named by this runner to make sure upstream changes doesn't affect the cache hit lookup
+		dest = filepath.Join(destDir, exec.Name+"-"+exec.Version+"-"+operatingSystem+"-"+architecture)
+	} else {
+		dest = expandWithMapAndEnv(exec.Target, envs, 3)
+	}
 	if cacheHit := isCacheHitFn(ctx, dest); cacheHit {
 		// exit if the artifact destination already exists
 		return dest, nil
@@ -60,17 +66,20 @@ func (e *executableDownloader) download(ctx context.Context, dir string, taskTyp
 		dest = dest + ".zst"
 	}
 
-	// if no cache hit, remove all downloaded executables for this task's type
+	// if no cache hit and destDir is set, remove all downloaded executables for this task's type
 	// so that we don't keep multiple executables of the same type
-	err := removeAllFn(destDir)
-	if err != nil {
-		return "", err
+	if destDir != "" {
+		if err := removeAllFn(destDir); err != nil {
+			return "", err
+		}
 	}
 
 	binPath, err := downloadFileFn(ctx, urls, dest)
 	if err != nil {
 		// remove the destination directory if downloading fails so it can be retried
-		removeAllFn(destDir)
+		if destDir != "" {
+			removeAllFn(destDir)
+		}
 		return "", err
 	}
 	e.logExecutableDownload(ctx, exec, operatingSystem, architecture)
@@ -82,11 +91,27 @@ func (e *executableDownloader) download(ctx context.Context, dir string, taskTyp
 		}
 	}
 
-	err = chmodFn(binPath, 0777)
-	if err != nil {
+	if err = chmodFn(binPath, 0777); err != nil {
 		return "", fmt.Errorf("failed to set executable flag in task file [%s]: %w", binPath, err)
 	}
 	return binPath, nil
+}
+
+// $A → $B/foo
+// $B → $C/bar
+// $C → "/root"
+// with 3 levels, A resolves to /root/bar/foo
+func expandWithMapAndEnv(s string, envs map[string]string, levels int) string {
+	expanded := s
+	for i := 0; i < levels; i++ {
+		expanded = os.Expand(expanded, func(key string) string {
+			if val, ok := envs[key]; ok {
+				return val
+			}
+			return os.Getenv(key)
+		})
+	}
+	return expanded
 }
 
 // decompressFile decompresses a zstd file if needed
