@@ -46,13 +46,13 @@ func (h *Router) RegisterFunc(name string, handler HandlerFunc) {
 	h.Register(name, HandlerFunc(handler))
 }
 
-// NotFound adds a handler to response whenver a
+// NotFound adds a handler to response whenever a
 // route cannot be found.
 func (h *Router) NotFound(handler Handler) {
 	h.notfound = handler
 }
 
-// NotFoundFunc adds a handler to response whenver a
+// NotFoundFunc adds a handler to response whenever a
 // route cannot be found.
 func (h *Router) NotFoundFunc(handler HandlerFunc) {
 	h.NotFound(HandlerFunc(handler))
@@ -70,10 +70,15 @@ func (h *Router) Handle(ctx context.Context, req *Request) Response {
 
 	// handle each secret sub-task before handling
 	// the primary task
-	var err error
-	req.Secrets, err = h.ResolveSecrets(ctx, req.Tasks)
-	if err != nil {
-		return Error(err)
+	if len(req.Tasks) > 0 {
+		taskSecrets, err := h.ResolveSecrets(ctx, req.Tasks)
+		if err != nil {
+			return Error(err)
+		}
+		// Appending resolved secrets to existing secrets
+		// This handles the scenario for Runner execute mode
+		// where Delegate handles resolving secrets for the task
+		req.Secrets = append(req.Secrets, taskSecrets...)
 	}
 
 	// add the structured logger to the context.
