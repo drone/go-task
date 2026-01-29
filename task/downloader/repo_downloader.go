@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,7 +17,7 @@ import (
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
 	"github.com/drone/go-task/task/logger"
-	"github.com/mholt/archiver"
+	"github.com/mholt/archives"
 )
 
 type repoDownloader struct {
@@ -113,56 +114,70 @@ func (r *repoDownloader) downloadRepo(ctx context.Context, repo *task.Repository
 // If destDir is "/tmp", this will extract the archive as /tmp/task.yml similar to the
 // clone behavior.
 func (r *repoDownloader) unarchive(srcPath, destDir string) error {
-	// create a custom walk function
-	walkFn := func(f archiver.File) error {
-		// skip directories
-		if f.IsDir() {
+	ctx := context.Background()
+
+	// Create a virtual filesystem from the archive
+	fsys, err := archives.FileSystem(ctx, srcPath, nil)
+	if err != nil {
+		return fmt.Errorf("error opening archive: %w", err)
+	}
+
+	// Walk through all files in the archive and extract them
+	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip root directory and directories themselves
+		if path == "." || d.IsDir() {
 			return nil
 		}
 
-		// get the relative path of the file within the archive
-		relPath := f.Name()
+		// Split the path into components
+		pathComponents := strings.Split(path, "/")
 
-		// split the path into components
-		pathComponents := strings.Split(relPath, string(filepath.Separator))
-
-		// if there's more than one component, remove the first one (top-level directory)
+		// Skip the top-level directory (e.g., "myrepo/task.yml" -> "task.yml")
+		var relPath string
 		if len(pathComponents) > 1 {
 			relPath = filepath.Join(pathComponents[1:]...)
+		} else {
+			relPath = path
 		}
 
-		// construct the target file path
+		// Construct target file path
 		targetFile := filepath.Join(destDir, relPath)
 
-		// ensure the directory structure exists
-		err := os.MkdirAll(filepath.Dir(targetFile), 0755)
-		if err != nil {
+		// Path traversal protection: validate target is within destination
+		if !strings.HasPrefix(filepath.Clean(targetFile), filepath.Clean(destDir)+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid file path: %s", path)
+		}
+
+		// Ensure the directory structure exists
+		if err := os.MkdirAll(filepath.Dir(targetFile), 0755); err != nil {
 			return fmt.Errorf("error creating directories: %w", err)
 		}
 
-		// create the target file
+		// Open source file from archive
+		srcFile, err := fsys.Open(path)
+		if err != nil {
+			return fmt.Errorf("error opening file in archive: %w", err)
+		}
+		defer srcFile.Close()
+
+		// Create the target file
 		outFile, err := os.Create(targetFile)
 		if err != nil {
 			return fmt.Errorf("error creating file: %w", err)
 		}
 		defer outFile.Close()
 
-		// copy the contents from the archive to the new file
-		_, err = io.Copy(outFile, f)
-		if err != nil {
+		// Copy the contents from the archive to the new file
+		if _, err = io.Copy(outFile, srcFile); err != nil {
 			return fmt.Errorf("error copying file contents: %w", err)
 		}
 
 		return nil
-	}
-
-	// open and walk through the archive
-	err := archiver.Walk(srcPath, walkFn)
-	if err != nil {
-		return fmt.Errorf("error walking through archive: %w", err)
-	}
-
-	return nil
+	})
 }
 
 // getDownloadDir returns the directory where the repository should be downloaded
