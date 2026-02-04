@@ -232,7 +232,7 @@ func TestResolveExpressions(t *testing.T) {
 	secrets := []*common.Secret{{ID: "secret_task_id", Value: "mySecret"}}
 	taskData, _ := json.Marshal(map[string]string{"taskKey": "this is my secret: ${{secrets.secret_task_id}}"})
 
-	resolvedTaskData, err := router.ResolveExpressions(noContext, secrets, taskData)
+	resolvedTaskData, _, err := router.ResolveExpressions(noContext, secrets, taskData)
 	if err != nil {
 		t.Errorf("error when resolving expressions: %s", err)
 	}

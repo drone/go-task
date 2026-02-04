@@ -14,6 +14,7 @@ const (
 
 // Resolve processes template expressions in the input data, evaluating nested expressions from innermost to outermost.
 // It supports nested expressions like: <{ outer <{ inner | getAsBase64 }> | getAsBase64 }>
+// It also tracks expressions that contain secrets and returns derived values that should be masked.
 //
 // Example:
 //
@@ -22,9 +23,20 @@ const (
 //
 //	Input:  "<{ <{ inner | getAsBase64 }> | getAsBase64 }>"
 //	Output: "aVc1dVpYST0=" (base64 of "aW5uZXI=", which is base64 of "inner")
-func ResolveWithTemplateFunctions(data []byte) ([]byte, error) {
+func ResolveWithTemplateFunctions(data []byte, secretValues []string) ([]byte, []string, error) {
 	input := string(data)
 	maxIterations := 100
+
+	// Initialize stringsToMask with secret values for checking, but we'll only return derived values
+	stringsToMask := make(map[string]bool)
+	for _, secret := range secretValues {
+		if secret != "" {
+			stringsToMask[secret] = true
+		}
+	}
+
+	// Track only the derived (new) values to return
+	additionalStringsToMask := []string{}
 
 	for i := 0; i < maxIterations; i++ {
 		start, end, found := findInnermostExpression(input)
@@ -33,17 +45,27 @@ func ResolveWithTemplateFunctions(data []byte) ([]byte, error) {
 		}
 
 		expr := input[start:end]
+
+		// Check if the expression contains any string that should be masked (before evaluation)
+		containsMaskedString := containsAnySubstring(expr, stringsToMask)
+
 		preprocessed := preprocessExpression(expr)
 
 		result, err := evaluateSingleExpression(preprocessed)
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating expression %q: %w", expr, err)
+			return nil, nil, fmt.Errorf("error evaluating expression %q: %w", expr, err)
+		}
+
+		// If the expression contained a masked string, add the result to masks
+		if containsMaskedString && result != "" && !stringsToMask[result] {
+			stringsToMask[result] = true
+			additionalStringsToMask = append(additionalStringsToMask, result)
 		}
 
 		input = input[:start] + result + input[end:]
 	}
 
-	return []byte(input), nil
+	return []byte(input), additionalStringsToMask, nil
 }
 
 // findInnermostExpression locates the deepest nested template expression in the input string.
@@ -154,4 +176,15 @@ func evaluateSingleExpression(expr string) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+// containsAnySubstring checks if the input string contains any of the substrings in the map.
+// Uses efficient substring matching for multiple patterns.
+func containsAnySubstring(input string, substrings map[string]bool) bool {
+	for substr := range substrings {
+		if strings.Contains(input, substr) {
+			return true
+		}
+	}
+	return false
 }

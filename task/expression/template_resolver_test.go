@@ -11,7 +11,7 @@ func TestTemplateResolver_Resolve(t *testing.T) {
 	expected := "my secret value: <no value> and another: <no value>"
 
 	// Act
-	output, err := ResolveWithTemplateFunctions(input)
+	output, _, err := ResolveWithTemplateFunctions(input, []string{})
 
 	// Assert
 	assert.NoError(t, err)
@@ -23,7 +23,7 @@ func TestTemplateResolver_Resolve_WithGetAsBase64(t *testing.T) {
 	expected1 := "my secret value in base64: dXNlcm5hbWU6IG15U2VjcmV0VmFsdWU=" // gitleaks:allow
 
 	// Act
-	output1, err := ResolveWithTemplateFunctions(input1)
+	output1, _, err := ResolveWithTemplateFunctions(input1, []string{})
 
 	// Assert
 	assert.NoError(t, err)
@@ -38,7 +38,7 @@ func TestTemplateResolver_Resolve_NestedGetAsBase64(t *testing.T) {
 	expected := "ohmy aGVsbG8gYzI5dFpYUm9hVzVu"
 
 	// Act
-	output, err := ResolveWithTemplateFunctions(input)
+	output, _, err := ResolveWithTemplateFunctions(input, []string{})
 
 	// Assert
 	assert.NoError(t, err)
@@ -54,7 +54,7 @@ func TestTemplateResolver_Resolve_DeeplyNestedGetAsBase64(t *testing.T) {
 	expected := "b3V0ZXIgYldsa1pHeGxJR0ZYTlhWYVdFazk="
 
 	// Act
-	output, err := ResolveWithTemplateFunctions(input)
+	output, _, err := ResolveWithTemplateFunctions(input, []string{})
 
 	// Assert
 	assert.NoError(t, err)
@@ -69,9 +69,48 @@ func TestTemplateResolver_Resolve_MultipleNestedExpressions(t *testing.T) {
 	expected := "first: YSBZZz09 and second: eCBlUT09"
 
 	// Act
-	output, err := ResolveWithTemplateFunctions(input)
+	output, _, err := ResolveWithTemplateFunctions(input, []string{})
 
 	// Assert
 	assert.NoError(t, err)
 	assert.Equal(t, expected, string(output))
+}
+
+func TestTemplateResolver_DerivedSecretMasking_SimpleBase64(t *testing.T) {
+	// Test that when an expression contains a secret, the base64-encoded result is returned as a mask
+	secretValue := "mySecretPassword123"
+	input := []byte("<{ username: " + secretValue + " | getAsBase64 }>")
+	// Expected base64 of "username: mySecretPassword123"
+	expectedOutput := "dXNlcm5hbWU6IG15U2VjcmV0UGFzc3dvcmQxMjM="
+
+	// Act
+	output, masks, err := ResolveWithTemplateFunctions(input, []string{secretValue})
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Equal(t, expectedOutput, string(output))
+	assert.Len(t, masks, 1, "Should return 1 derived mask")
+	assert.Equal(t, expectedOutput, masks[0], "The base64-encoded result should be in the masks list")
+}
+
+func TestTemplateResolver_DerivedSecretMasking_NestedExpressions(t *testing.T) {
+	// Test that nested expressions containing secrets return multiple derived masks
+	secretValue := "secret123"
+	input := []byte("result: <{ outer <{ inner " + secretValue + " | getAsBase64 }> | getAsBase64 }>")
+
+	// Inner: "inner secret123" -> base64 = "aW5uZXIgc2VjcmV0MTIz"
+	innerBase64 := "aW5uZXIgc2VjcmV0MTIz"
+	// Outer: "outer aW5uZXIgc2VjcmV0MTIz" -> base64 = "b3V0ZXIgYVc1dVpYSWdjMlZqY21WME1USXo="
+	outerBase64 := "b3V0ZXIgYVc1dVpYSWdjMlZqY21WME1USXo="
+	expectedOutput := "result: " + outerBase64
+
+	// Act
+	output, masks, err := ResolveWithTemplateFunctions(input, []string{secretValue})
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Equal(t, expectedOutput, string(output))
+	assert.Len(t, masks, 2, "Should return 2 derived masks (inner and outer)")
+	assert.Contains(t, masks, innerBase64, "Inner base64 result should be in masks")
+	assert.Contains(t, masks, outerBase64, "Outer base64 result should be in masks")
 }

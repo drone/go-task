@@ -149,13 +149,13 @@ func (h *Router) ResolveSecrets(ctx context.Context, tasks []*Task) ([]*common.S
 	return secrets, nil
 }
 
-func (h *Router) ResolveExpressions(ctx context.Context, secrets []*common.Secret, taskData []byte) ([]byte, error) {
+func (h *Router) ResolveExpressions(ctx context.Context, secrets []*common.Secret, taskData []byte) ([]byte, []string, error) {
 	resolver := expression.New(secrets)
-	resolvedTaskData, err := resolver.Resolve(taskData)
+	resolvedTaskData, additionalMasks, err := resolver.Resolve(taskData)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return resolvedTaskData, nil
+	return resolvedTaskData, additionalMasks, nil
 }
 
 // handle routes the task request to a handler.
@@ -178,13 +178,26 @@ func (h *Router) handle(ctx context.Context, req *Request) Response {
 
 	// evaluate expressions
 	var err error
-	req.Task.Data, err = h.ResolveExpressions(ctx, req.Secrets, req.Task.Data)
+	var additionalMasks []string
+	req.Task.Data, additionalMasks, err = h.ResolveExpressions(ctx, req.Secrets, req.Task.Data)
 	if err != nil {
 		return Error(err)
 	}
 
+	addDerivedSecrets(req, additionalMasks)
+
 	// execute the handler stack with middleware
 	return chain(h.middleware, handler).Handle(ctx, req)
+}
+
+func addDerivedSecrets(req *Request, additionalMasks []string) {
+	for i, maskValue := range additionalMasks {
+		derivedSecret := &common.Secret{
+			ID:    fmt.Sprintf("__derivedSecret_%d", i),
+			Value: maskValue,
+		}
+		req.Secrets = append(req.Secrets, derivedSecret)
+	}
 }
 
 // chain builds a Handler composed of an inline

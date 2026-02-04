@@ -187,7 +187,7 @@ func handleResolve(inputJson, secretsJSON string) {
 	resolver := expression.New(secrets)
 
 	// resolve the expression
-	resolvedData, err := resolver.Resolve([]byte(inputJson))
+	resolvedData, _, err := resolver.Resolve([]byte(inputJson))
 	if err != nil {
 		log.Fatalf("Failed to resolve expression: %v", err)
 	}
