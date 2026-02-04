@@ -33,8 +33,8 @@ func (r *Resolver) Resolve(taskData []byte) ([]byte, error) {
 	}
 
 	// Second pass: Handle template resolver syntax
-	templateResolver := newTemplateResolver(r.secrets)
-	finalResolvedData, err := templateResolver.Resolve(currentData)
+	// This is used solely to resolve the `<{ content | getAsBase64 }>` expressions
+	finalResolvedData, err := ResolveWithTemplateFunctions(currentData)
 	if err != nil {
 		return nil, err
 	}

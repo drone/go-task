@@ -16,8 +16,10 @@ import (
 
 	"github.com/drone/go-task/task"
 	"github.com/drone/go-task/task/cloner"
+	"github.com/drone/go-task/task/common"
 	download "github.com/drone/go-task/task/downloader"
 	"github.com/drone/go-task/task/drivers/cgi"
+	"github.com/drone/go-task/task/expression"
 	"github.com/drone/go-task/task/packaged"
 )
 
@@ -33,6 +35,10 @@ var (
 
 	// displays the help / usage if true
 	help = flag.Bool("help", false, "")
+
+	// resolve mode flags
+	resolveExpr = flag.String("resolve", "", "")
+	secretsJSON = flag.String("secrets", "", "")
 )
 
 func main() {
@@ -46,6 +52,12 @@ func main() {
 	if *help {
 		flag.Usage()
 		os.Exit(0)
+	}
+
+	// handle resolve mode
+	if *resolveExpr != "" {
+		handleResolve(*resolveExpr, *secretsJSON)
+		return
 	}
 
 	// set the default log level
@@ -156,6 +168,34 @@ func main() {
 	os.Stdout.Write(res.Body())
 }
 
+func handleResolve(inputJson, secretsJSON string) {
+	// parse secrets from JSON
+	var secrets []*common.Secret
+	if secretsJSON != "" {
+		if err := json.Unmarshal([]byte(secretsJSON), &secrets); err != nil {
+			log.Fatalf("Failed to parse secrets JSON: %v", err)
+		}
+	}
+
+	// validate input is valid JSON
+	var testJSON interface{}
+	if err := json.Unmarshal([]byte(inputJson), &testJSON); err != nil {
+		log.Fatalf("Input must be valid JSON: %v", err)
+	}
+
+	// create resolver
+	resolver := expression.New(secrets)
+
+	// resolve the expression
+	resolvedData, err := resolver.Resolve([]byte(inputJson))
+	if err != nil {
+		log.Fatalf("Failed to resolve expression: %v", err)
+	}
+
+	// print resolved result
+	fmt.Println(string(resolvedData))
+}
+
 var usage = func() {
 	println(`Usage: go-task [OPTION]... [PATH]
 
@@ -164,7 +204,12 @@ var usage = func() {
   -v, --verbose        execute the task with verbose output
   -h, --help           display this help and exit
 
+  Expression Resolver Mode:
+      --resolve        expression string to resolve
+      --secrets        JSON array of secrets [{"id":"key","value":"val"}]
+
 Examples:
   go-task path/to/task.json
+  go-task --resolve "Hello \${{secrets.name}}" --secrets '[{"id":"name","value":"World"}]'
 `)
 }

@@ -8,8 +8,6 @@
 package evaler
 
 import (
-	"encoding/base64"
-	"regexp"
 	"strings"
 
 	"github.com/drone/go-task/task/common"
@@ -29,7 +27,6 @@ func Eval(data map[string]any, secrets []*common.Secret) {
 				return
 			}
 			v = resolveSecrets(v, secrets)
-			v = resolveGetAsBase64(v)
 			return true, v
 		case []any:
 			for i := 0; i < len(v); i++ {
@@ -62,21 +59,4 @@ func resolveSecrets(s string, secrets []*common.Secret) string {
 		s = strings.ReplaceAll(s, a, b)
 	}
 	return s
-}
-
-func resolveGetAsBase64(s string) string {
-	// regex to match the pattern ${{getAsBase64(...)}}
-	// the (?s) modifier will make the `.` also match line breaks ("\n")
-	re := regexp.MustCompile(`(?s)\$\{\{getAsBase64\((.*?)\)\}\}`)
-
-	// replace the matched strings with their base64-encoded values
-	return re.ReplaceAllStringFunc(s, func(match string) string {
-		// extract the string wrapped by ${{getAsBase64(...)}}
-		submatch := re.FindStringSubmatch(match)
-		if len(submatch) > 1 {
-			// Encode it to to base64
-			return base64.StdEncoding.EncodeToString([]byte(submatch[1]))
-		}
-		return match
-	})
 }
